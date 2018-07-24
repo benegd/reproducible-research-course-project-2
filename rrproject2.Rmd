@@ -78,6 +78,14 @@ if(!file.exists(zippath)){
 ```
 
 
+Loading data into R
+-------------------
+``` {r}
+stormdata <- read.csv(zippath)
+head(stormdata)
+summary(stormdata)
+str(stormdata)
+```
 
 
 
