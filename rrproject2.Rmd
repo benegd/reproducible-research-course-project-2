@@ -1,0 +1,98 @@
+---
+title: "Reproducible Research Course Project 2"
+author: "Benjamin Estrade"
+date: "24 July 2018"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+Synopsis
+========
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Project Goal
+============
+
+Use the data to answer some basic questions about severe weather events.
+
+Questions:
+1. Across the United States, which types of events (as indicated in the <span style="color:red" face="KaTeX_Typewriter">EVTYPE</span> variable) are most harmful with respect to population health?
+
+2. Across the United States, which types of events have the greatest economic consequences?
+
+
+Data Processing
+===============
+
+Details about project
+---------------------
+
+Copy of the data can be found in the [GitHub directory](https://github.com/benegd/reproducible-research-course-project-2).
+
+Data retrived from the [here](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2)
+
+This project is part of the data science specialization course by John Hopkins University hosted by [Coursera](https://www.coursera.com/).
+
+Consult README.md for more information
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+System info
+-----------
+
+```{r}
+sessionInfo()
+```
+
+
+Downloading Data from orginal source
+------------------------------------
+
+``` {r}
+fileurl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+zippath <- "./ProjectData/Storm_data.csv.bz2"
+projectdatapath <- "./ProjectData"
+if(!file.exists(zippath)){
+        if(!dir.exists(projectdatapath)){
+               dir.create(projectdatapath) 
+        }
+        download.file(fileurl, zippath)
+}
+        
+```
+
+
+
+
+
+
+Results
+=======
+
+
+
+
+
+
+
+
+
+
+
+
