@@ -1,5 +1,5 @@
 ---
-title: "Reproducible Research Course Project 2"
+title: "Storm event types that cause the largest impact"
 author: "Benjamin Estrade"
 date: "24 July 2018"
 output: 
