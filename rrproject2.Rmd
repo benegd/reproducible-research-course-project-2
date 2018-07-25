@@ -63,7 +63,10 @@ sessionInfo()
 Loading Libraries
 -----------------
 ```{r}
+library(plyr)
 library(dplyr)
+library(reshape2)
+library(ggplot2)
 ```
 
 
@@ -81,7 +84,7 @@ if(!file.exists(zippath)){
         }
         download.file(fileurl, zippath)
 }
-        
+rm(fileurl)
 ```
 
 
@@ -89,6 +92,7 @@ Loading data into R
 -------------------
 ``` {r cache=TRUE}
 stormdata <- read.csv(zippath)
+rm(zippath)
 head(stormdata)
 summary(stormdata)
 str(stormdata)
@@ -130,6 +134,8 @@ This question could be interepted in several ways, some things to consider
 
 * The event type will grouped by event name
 
+* Since an acurate prediction model for times in between freak event of certain event types isn't available the assumption wil be made the same type and magnitude is as likely to reoccur as any other event type. 
+
 ### Have the damage of unusual natural effects changed over time
 
 If there is a correlation between time and the effect in regards to death and injury this should be account for. 
@@ -166,6 +172,7 @@ Checking there is a significant difference over time.
 
 ```{r}
 timeco <- -as.numeric(lminjovertime$coefficients[2])
+rm(lminjovertime)
 rmnegdate <- -as.numeric(min(stormdatahealth$BGN_DATE))
 #apply seems to extract each variable as character so the as.Date neeeded to be reapplied, this wouldn't be required otherwise
 timeallowfunc <- function(x) {
@@ -188,6 +195,7 @@ The differnce is substantial enough and thus the allowance will be added.
 
 ```{r}
 stormdatahealth$FAI_TIME_PEN <- apply(stormdatahealth, 1, timeallowfunc)
+rm(timeallowfunc, oldestevent, newestevent, rmnegdate, timeco)
 head(stormdatahealth[,c("FATAL_AND_INJ", "FAI_TIME_PEN")])
 tail(stormdatahealth[,c("FATAL_AND_INJ", "FAI_TIME_PEN")])
 ```
@@ -202,11 +210,17 @@ head(arrange(penaltyeval, desc(TOTAL)))
 
 Although the pentaly does have an affect on the order in which the events should be considered to have the largest impact tornado clearly have the largest impact in both occasions.
 
+The impact of the zero measure might have impacted the decline even though this could also skew the results as more events are currently recorded than in previous years. 
+
+```{r}
+rm(penaltyeval)
+```
+
 ### How human health will be considered for this study
 
-The comparing a human life to severe injury is contraversal and in the terms of the data can't be defined even in a monetary way. 
+The comparing a human life to severe injury is contraversal and in the terms of the data the specific severity of injuries is not defined and the type widely varied so it can't be defined even in a monetary way.
 
-Testing if changed the ratio of value place on death compared to injury affects the most harmful event type.
+Testing if changed the ratio of value place on death compared to injury affects the most harmful event type. To see if futher research would be worthwhile to give a clearer result. 
 
 Since it is very difficult to define a ratio a broad range from 1:1 to 100:1 will be tested. 
 
@@ -218,6 +232,71 @@ totalinjsperevent <- arrange(totalinjsperevent, desc(TOTAL_FAI))[1:20,]
 head(totalinjsperevent)
 ```
 
+Calculating data required for a normalized plot
+
+```{r}
+#creating the x values, which will be the fatality to injury grading ratio
+injurygradingratio <- c(1, seq(5,100, by = 5))
+#function for calulating the new grade based on the ratio
+ratio_calc <- function(event_totals, xvalues){
+        total_fatals <- as.numeric(event_totals["TOTAL_FATAL"])
+        total_injuries <- as.numeric(event_totals["TOTAL_INJ"])
+        total_fatals * xvalues + total_injuries
+}
+graded_health_scores <- apply(totalinjsperevent, 1, ratio_calc, xvalues = injurygradingratio)
+colnames(graded_health_scores) <- totalinjsperevent$EVTYPE
+head(graded_health_scores)
+```
+
+
+Melting the data frame in to x y cordinates and normalizing
+
+```{r}
+event_type_count <- ncol(graded_health_scores)
+graded_health_scores <- melt(graded_health_scores)
+graded_health_scores$Var1 <- rep(injurygradingratio, event_type_count)
+colnames(graded_health_scores) <- c("ratio", "event_type", "scores")
+norm_graded_health_scores <- graded_health_scores %>% group_by(ratio) %>% mutate_at(vars(scores), funs(scale(.) %>% as.vector()) )
+head(norm_graded_health_scores)
+```
+
+Plotting the effect of the ratio
+
+```{r}
+p <- ggplot(norm_graded_health_scores[1:105,], aes(x=ratio, y=scores, colour = event_type, group = event_type))
+p <- p + geom_line()
+p <- p + geom_point()
+p <- p + labs( x = "Ratio")
+p <- p + labs(y = "Impact to Human Health Score")
+p <- p + ggtitle("Impact of changing the \nfatality:injury ratio")
+p
+```
+
+From this plot we can see that how we ratio is not important in derterming the event type with the largest impact to human health.
+
+### Output plot
+
+Since putting a higher value on fatalities compared to injuries did affect the outcome of the event type with the largest impact. Nor did calculation of reducition indamage to human health in modern times. The output plot will simply contain some of the highest damage event types with the quanities of injuries and deaths.
+
+I will use the previously generated totals dataset.
+
+```{r}
+totals <- totalinjsperevent %>% arrange(desc(TOTAL_FAI)) %>% select(-TOTAL_FAI)
+totals <- melt(totals, id.vars = "EVTYPE", measure.vars = c("TOTAL_FATAL", "TOTAL_INJ"))
+colnames(totals) <- c("event", "injury_type","no_of_injuries")
+totals$injury_type <- revalue(totals$injury_type, c( "TOTAL_INJ" = "Injuries", "TOTAL_FATAL" = "Fatalities"))
+totals$event <- factor(totals$event, levels = totalinjsperevent$EVTYPE)
+totals$injury_type <- factor(totals$injury_type, c("Injuries", "Fatalities"))
+p <- ggplot(totals, aes(x=event, y=no_of_injuries, fill = injury_type))
+p <- p + geom_bar(stat = "identity")
+p <- p + scale_fill_manual(values=c("rosybrown", "red3"))
+p <- p + guides(fill = guide_legend(reverse = FALSE, title = "Type of Injury"))
+p <- p + labs( x = "Event Type")
+p <- p + labs(y = "No. of people impacted")
+p <- p + ggtitle("Impact of different events to human health")
+p <- p + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+p
+```
 
 Results
 =======
