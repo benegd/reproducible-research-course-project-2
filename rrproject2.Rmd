@@ -60,6 +60,13 @@ System info
 sessionInfo()
 ```
 
+Loading Libraries
+-----------------
+```{r}
+library(dplyr)
+```
+
+
 
 Downloading Data from orginal source
 ------------------------------------
@@ -80,14 +87,136 @@ if(!file.exists(zippath)){
 
 Loading data into R
 -------------------
-``` {r}
+``` {r cache=TRUE}
 stormdata <- read.csv(zippath)
 head(stormdata)
 summary(stormdata)
 str(stormdata)
 ```
 
+Cleaning the data
+-----------------
 
+Converting the BGN_DATE to date format
+
+```{r}
+stormdata$BGN_DATE <- as.Date(stormdata$BGN_DATE, "%m/%d/%Y")
+str(stormdata$BGN_DATE)
+```
+
+
+Question 1 - Which types of events are most harmful to human health
+-----------------------------------------------------------------------
+
+This question could be interepted in several ways, some things to consider
+
+* human health could be considered in the following ways:
+        + the most people effected
+        + only permant effects considered
+        + only direct fatalities considered
+        + a different scoring for direct and indirect fatalities/injuries
+        +a different scoring for fatalities and injuries
+* classification of event type could be considered in the following ways:
+        + Event Name
+        + Designator
+* is there more data available for certain event types and thus could the results be skewed?
+* advancements in warning systems may have reduce the damage of particular event types in more recent years, should this be a consideration?
+* should the most extreme cases be included or valued the same?
+* will the population suffer the same impact from the same event as in previous times
+
+### Assumptions 
+
+* The study doesn't specify if deaths and injury are caused directly or indirectly. For this reason they will be treated of the same value. 
+
+* The event type will grouped by event name
+
+### Have the damage of unusual natural effects changed over time
+
+If there is a correlation between time and the effect in regards to death and injury this should be account for. 
+
+Linear regression will be used, if a p value of less than 0.02 is found then a allowance based on the regression will be used.
+
+This should correlation should include the advancements in any warning systems over time. 
+
+Adding a sum of deaths and injuries to the data. New column will be called FATAL_AND_INJ
+
+````{r}
+stormdata <- stormdata %>% mutate(FATAL_AND_INJ = FATALITIES + INJURIES)
+head(stormdata[,c("FATALITIES","INJURIES","FATAL_AND_INJ")])
+```
+
+Creating a liner regresion model to evaulate the correlation.
+
+Due to the data size and my limited computing power I have had to remove all events that have resulted in no fatalities or injuries for the human health question.
+
+
+```{r cache=TRUE}
+stormdatahealth <- stormdata[stormdata$FATAL_AND_INJ > 0,]
+lminjovertime <- lm(FATAL_AND_INJ ~ BGN_DATE, stormdatahealth)
+summary(lminjovertime)
+```
+
+Time seems to be coralated to the number of deaths and injurys with a reduction in injuries over time. Thus a pentaly should be given based on the the linear regresion. The total fatalities and injuries will be adjusted using the BGN_DATE coefficient from this model and added to a new variable called FAI_TIME_PEN. 
+
+Another adjust has been made so the pental startes at 0 otherwise the earlier values would be negatives.
+
+The coefficent has been reverse to allow add a pentaly to newer events rather than substracting from the older events
+
+Checking there is a significant difference over time.
+
+```{r}
+timeco <- -as.numeric(lminjovertime$coefficients[2])
+rmnegdate <- -as.numeric(min(stormdatahealth$BGN_DATE))
+#apply seems to extract each variable as character so the as.Date neeeded to be reapplied, this wouldn't be required otherwise
+timeallowfunc <- function(x) {
+        if(class(x[["BGN_DATE"]]) != "Date"){
+             dateasnum <- as.numeric(as.Date(x["BGN_DATE"]))   
+        } else {
+                dateasnum <- as.numeric(x["BGN_DATE"])
+        }
+        
+        totalhurt <- as.numeric(x["FATAL_AND_INJ"])
+        totalhurt + (dateasnum + rmnegdate) * timeco
+}
+oldestevent <- stormdatahealth[which.min(stormdatahealth$BGN_DATE),]
+newestevent <- stormdatahealth[which.max(stormdatahealth$BGN_DATE),]
+timeallowfunc(newestevent) - newestevent["FATAL_AND_INJ"]
+timeallowfunc(oldestevent) - oldestevent["FATAL_AND_INJ"]
+```
+
+The differnce is substantial enough and thus the allowance will be added. 
+
+```{r}
+stormdatahealth$FAI_TIME_PEN <- apply(stormdatahealth, 1, timeallowfunc)
+head(stormdatahealth[,c("FATAL_AND_INJ", "FAI_TIME_PEN")])
+tail(stormdatahealth[,c("FATAL_AND_INJ", "FAI_TIME_PEN")])
+```
+
+#### Does the pentaly impact the event type with the largest impact?
+
+```{r}
+penaltyeval <- stormdatahealth %>% group_by(EVTYPE) %>% summarise(TOTAL = sum(FATAL_AND_INJ), TOTAL_W_PEN = sum(FAI_TIME_PEN))
+head(arrange(penaltyeval, desc(TOTAL_W_PEN)))
+head(arrange(penaltyeval, desc(TOTAL)))
+```
+
+Although the pentaly does have an affect on the order in which the events should be considered to have the largest impact tornado clearly have the largest impact in both occasions.
+
+### How human health will be considered for this study
+
+The comparing a human life to severe injury is contraversal and in the terms of the data can't be defined even in a monetary way. 
+
+Testing if changed the ratio of value place on death compared to injury affects the most harmful event type.
+
+Since it is very difficult to define a ratio a broad range from 1:1 to 100:1 will be tested. 
+
+Only the 20 event types with the highest health impact will be reviewed.
+
+```{r}
+totalinjsperevent <- stormdatahealth %>% group_by(EVTYPE) %>% summarise(TOTAL_FATAL = sum(FATALITIES), TOTAL_INJ = sum(INJURIES), TOTAL_FAI = sum(FATAL_AND_INJ))
+totalinjsperevent <- arrange(totalinjsperevent, desc(TOTAL_FAI))[1:20,]
+head(totalinjsperevent)
+```
 
 
 Results
