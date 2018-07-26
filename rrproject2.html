@@ -131,6 +131,23 @@ $(document).ready(function () {
 
 <div id="synopsis" class="section level1">
 <h1>Synopsis</h1>
+<div id="question-1---impact-on-human-health" class="section level2">
+<h2>Question 1 - Impact on human health</h2>
+<ul>
+<li><p>Tornados have the most impact on human health</p></li>
+<li><p>Tornados cause the greatest loss of life</p></li>
+<li><p>Tornados cause the most injuries</p></li>
+</ul>
+</div>
+<div id="question-2---largest-economic-cost" class="section level2">
+<h2>Question 2 - Largest economic cost</h2>
+<ul>
+<li><p>Floods cause the most economic damage</p></li>
+<li><p>Floods cause the most property damage</p></li>
+<li><p>Droughts cause the most crop damage</p></li>
+</ul>
+<p><strong>NOTE.</strong> Figures are shown in the results section. All calculations are shown in the data processing section.</p>
+</div>
 </div>
 <div id="project-goal" class="section level1">
 <h1>Project Goal</h1>
@@ -172,6 +189,39 @@ $(document).ready(function () {
 ##  [9] stringi_1.1.7   rmarkdown_1.10  knitr_1.20      stringr_1.3.1  
 ## [13] digest_0.6.15   evaluate_0.11</code></pre>
 </div>
+<div id="loading-libraries" class="section level2">
+<h2>Loading Libraries</h2>
+<pre class="r"><code>library(plyr)</code></pre>
+<pre><code>## Warning: package 'plyr' was built under R version 3.5.1</code></pre>
+<pre class="r"><code>library(dplyr)</code></pre>
+<pre><code>## Warning: package 'dplyr' was built under R version 3.5.1</code></pre>
+<pre><code>## 
+## Attaching package: 'dplyr'</code></pre>
+<pre><code>## The following objects are masked from 'package:plyr':
+## 
+##     arrange, count, desc, failwith, id, mutate, rename, summarise,
+##     summarize</code></pre>
+<pre><code>## The following objects are masked from 'package:stats':
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(reshape2)</code></pre>
+<pre><code>## Warning: package 'reshape2' was built under R version 3.5.1</code></pre>
+<pre class="r"><code>library(ggplot2)</code></pre>
+<pre><code>## Warning: package 'ggplot2' was built under R version 3.5.1</code></pre>
+<pre class="r"><code>library(lubridate)</code></pre>
+<pre><code>## Warning: package 'lubridate' was built under R version 3.5.1</code></pre>
+<pre><code>## 
+## Attaching package: 'lubridate'</code></pre>
+<pre><code>## The following object is masked from 'package:plyr':
+## 
+##     here</code></pre>
+<pre><code>## The following object is masked from 'package:base':
+## 
+##     date</code></pre>
+</div>
 <div id="downloading-data-from-orginal-source" class="section level2">
 <h2>Downloading Data from orginal source</h2>
 <pre class="r"><code>fileurl &lt;- &quot;https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2&quot;
@@ -182,11 +232,13 @@ if(!file.exists(zippath)){
                dir.create(projectdatapath) 
         }
         download.file(fileurl, zippath)
-}</code></pre>
+}
+rm(fileurl)</code></pre>
 </div>
 <div id="loading-data-into-r" class="section level2">
 <h2>Loading data into R</h2>
 <pre class="r"><code>stormdata &lt;- read.csv(zippath)
+rm(zippath)
 head(stormdata)</code></pre>
 <pre><code>##   STATE__           BGN_DATE BGN_TIME TIME_ZONE COUNTY COUNTYNAME STATE
 ## 1       1  4/18/1950 0:00:00     0130       CST     97     MOBILE    AL
@@ -360,9 +412,526 @@ head(stormdata)</code></pre>
 ##  $ REMARKS   : Factor w/ 436781 levels &quot;&quot;,&quot;-2 at Deer Park\n&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
 ##  $ REFNUM    : num  1 2 3 4 5 6 7 8 9 10 ...</code></pre>
 </div>
+<div id="cleaning-the-data" class="section level2">
+<h2>Cleaning the data</h2>
+<p>Converting the BGN_DATE to date format</p>
+<pre class="r"><code>stormdata$BGN_DATE &lt;- as.Date(stormdata$BGN_DATE, &quot;%m/%d/%Y&quot;)
+str(stormdata$BGN_DATE)</code></pre>
+<pre><code>##  Date[1:902297], format: &quot;1950-04-18&quot; &quot;1950-04-18&quot; &quot;1951-02-20&quot; &quot;1951-06-08&quot; &quot;1951-11-15&quot; ...</code></pre>
+<p>Data on damage cost is provided as a 3 signifcant figure value and a expander letter</p>
+<ul>
+<li><p>K = 1 000</p></li>
+<li><p>M = 1 000 000</p></li>
+<li><p>B = 1 000 000 000</p></li>
+</ul>
+<p>Converting these values to numeric</p>
+<pre class="r"><code>value_from_expander &lt;- function(data, damage_type){
+        damage_type_exp &lt;- paste(damage_type, &quot;EXP&quot;, sep=&quot;&quot;)
+        damage_value &lt;- as.numeric(data[damage_type])
+        damage_exp &lt;- data[damage_type_exp]
+        if(damage_exp == &quot;K&quot;){
+                damage_value &lt;- damage_value * 1000
+        } else if(damage_exp == &quot;M&quot;){
+                damage_value &lt;- damage_value * 1000000
+        } else if(damage_exp == &quot;B&quot;){
+                damage_value &lt;- damage_value * 1000000000
+        }
+        damage_value
+}
+stormdata$Property_damage_USD &lt;- apply(stormdata, 1, value_from_expander, damage_type = &quot;PROPDMG&quot;)
+stormdata$Crop_damage_USD &lt;- apply(stormdata, 1, value_from_expander, damage_type = &quot;CROPDMG&quot;)
+stormdata$Total_damage &lt;- stormdata$Property_damage_USD + stormdata$Crop_damage_USD
+head(stormdata)</code></pre>
+<pre><code>##   STATE__   BGN_DATE BGN_TIME TIME_ZONE COUNTY COUNTYNAME STATE  EVTYPE
+## 1       1 1950-04-18     0130       CST     97     MOBILE    AL TORNADO
+## 2       1 1950-04-18     0145       CST      3    BALDWIN    AL TORNADO
+## 3       1 1951-02-20     1600       CST     57    FAYETTE    AL TORNADO
+## 4       1 1951-06-08     0900       CST     89    MADISON    AL TORNADO
+## 5       1 1951-11-15     1500       CST     43    CULLMAN    AL TORNADO
+## 6       1 1951-11-15     2000       CST     77 LAUDERDALE    AL TORNADO
+##   BGN_RANGE BGN_AZI BGN_LOCATI END_DATE END_TIME COUNTY_END COUNTYENDN
+## 1         0                                               0         NA
+## 2         0                                               0         NA
+## 3         0                                               0         NA
+## 4         0                                               0         NA
+## 5         0                                               0         NA
+## 6         0                                               0         NA
+##   END_RANGE END_AZI END_LOCATI LENGTH WIDTH F MAG FATALITIES INJURIES
+## 1         0                      14.0   100 3   0          0       15
+## 2         0                       2.0   150 2   0          0        0
+## 3         0                       0.1   123 2   0          0        2
+## 4         0                       0.0   100 2   0          0        2
+## 5         0                       0.0   150 2   0          0        2
+## 6         0                       1.5   177 2   0          0        6
+##   PROPDMG PROPDMGEXP CROPDMG CROPDMGEXP WFO STATEOFFIC ZONENAMES LATITUDE
+## 1    25.0          K       0                                         3040
+## 2     2.5          K       0                                         3042
+## 3    25.0          K       0                                         3340
+## 4     2.5          K       0                                         3458
+## 5     2.5          K       0                                         3412
+## 6     2.5          K       0                                         3450
+##   LONGITUDE LATITUDE_E LONGITUDE_ REMARKS REFNUM Property_damage_USD
+## 1      8812       3051       8806              1               25000
+## 2      8755          0          0              2                2500
+## 3      8742          0          0              3               25000
+## 4      8626          0          0              4                2500
+## 5      8642          0          0              5                2500
+## 6      8748          0          0              6                2500
+##   Crop_damage_USD Total_damage
+## 1               0        25000
+## 2               0         2500
+## 3               0        25000
+## 4               0         2500
+## 5               0         2500
+## 6               0         2500</code></pre>
+</div>
+<div id="question-1---which-types-of-events-are-most-harmful-to-human-health" class="section level2">
+<h2>Question 1 - Which types of events are most harmful to human health</h2>
+<p>This question could be interepted in several ways, some things to consider</p>
+<ul>
+<li>human health could be considered in the following ways: + the most people effected + only permant effects considered + only direct fatalities considered + a different scoring for direct and indirect fatalities/injuries +a different scoring for fatalities and injuries</li>
+<li>classification of event type could be considered in the following ways: + Event Name + Designator</li>
+<li>is there more data available for certain event types and thus could the results be skewed?</li>
+<li>advancements in warning systems may have reduce the damage of particular event types in more recent years, should this be a consideration?</li>
+<li>should the most extreme cases be included or valued the same?</li>
+<li>will the population suffer the same impact from the same event as in previous times</li>
+</ul>
+<div id="assumptions" class="section level3">
+<h3>Assumptions</h3>
+<ul>
+<li><p>The study doesn’t specify if deaths and injury are caused directly or indirectly. For this reason they will be treated of the same value.</p></li>
+<li><p>The event type will grouped by event name</p></li>
+<li><p>Since an acurate prediction model for times in between freak event of certain event types isn’t available the assumption wil be made the same type and magnitude is as likely to reoccur as any other event type.</p></li>
+</ul>
+</div>
+<div id="have-the-damage-of-unusual-natural-effects-changed-over-time" class="section level3">
+<h3>Have the damage of unusual natural effects changed over time</h3>
+<p>If there is a correlation between time and the effect in regards to death and injury this should be account for.</p>
+<p>Linear regression will be used, if a p value of less than 0.02 is found then a allowance based on the regression will be used.</p>
+<p>This should correlation should include the advancements in any warning systems over time.</p>
+<p>Adding a sum of deaths and injuries to the data. New column will be called FATAL_AND_INJ</p>
+<pre class="r"><code>stormdata &lt;- stormdata %&gt;% mutate(FATAL_AND_INJ = FATALITIES + INJURIES)</code></pre>
+<pre><code>## Warning: package 'bindrcpp' was built under R version 3.5.1</code></pre>
+<pre class="r"><code>head(stormdata[,c(&quot;FATALITIES&quot;,&quot;INJURIES&quot;,&quot;FATAL_AND_INJ&quot;)])</code></pre>
+<pre><code>##   FATALITIES INJURIES FATAL_AND_INJ
+## 1          0       15            15
+## 2          0        0             0
+## 3          0        2             2
+## 4          0        2             2
+## 5          0        2             2
+## 6          0        6             6</code></pre>
+<p>Creating a liner regresion model to evaulate the correlation.</p>
+<p>Due to the data size and my limited computing power I have had to remove all events that have resulted in no fatalities or injuries for the human health question.</p>
+<pre class="r"><code>stormdatahealth &lt;- stormdata[stormdata$FATAL_AND_INJ &gt; 0,]
+lminjovertime &lt;- lm(FATAL_AND_INJ ~ BGN_DATE, stormdatahealth)
+summary(lminjovertime)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = FATAL_AND_INJ ~ BGN_DATE, data = stormdatahealth)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+##  -15.00   -5.72   -4.05   -2.40 1731.98 
+## 
+## Coefficients:
+##               Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)  1.191e+01  4.501e-01   26.47   &lt;2e-16 ***
+## BGN_DATE    -5.596e-04  4.407e-05  -12.70   &lt;2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 35.91 on 21927 degrees of freedom
+## Multiple R-squared:  0.0073, Adjusted R-squared:  0.007255 
+## F-statistic: 161.2 on 1 and 21927 DF,  p-value: &lt; 2.2e-16</code></pre>
+<p>Time seems to be coralated to the number of deaths and injurys with a reduction in injuries over time. Thus a pentaly should be given based on the the linear regresion. The total fatalities and injuries will be adjusted using the BGN_DATE coefficient from this model and added to a new variable called FAI_TIME_PEN.</p>
+<p>Another adjust has been made so the pental startes at 0 otherwise the earlier values would be negatives.</p>
+<p>The coefficent has been reverse to allow add a pentaly to newer events rather than substracting from the older events</p>
+<p>Checking there is a significant difference over time.</p>
+<pre class="r"><code>timeco &lt;- -as.numeric(lminjovertime$coefficients[2])
+rm(lminjovertime)
+rmnegdate &lt;- -as.numeric(min(stormdatahealth$BGN_DATE))
+#apply seems to extract each variable as character so the as.Date neeeded to be reapplied, this wouldn't be required otherwise
+timeallowfunc &lt;- function(x) {
+        if(class(x[[&quot;BGN_DATE&quot;]]) != &quot;Date&quot;){
+             dateasnum &lt;- as.numeric(as.Date(x[&quot;BGN_DATE&quot;]))   
+        } else {
+                dateasnum &lt;- as.numeric(x[&quot;BGN_DATE&quot;])
+        }
+        
+        totalhurt &lt;- as.numeric(x[&quot;FATAL_AND_INJ&quot;])
+        totalhurt + (dateasnum + rmnegdate) * timeco
+}
+oldestevent &lt;- stormdatahealth[which.min(stormdatahealth$BGN_DATE),]
+newestevent &lt;- stormdatahealth[which.max(stormdatahealth$BGN_DATE),]
+timeallowfunc(newestevent) - newestevent[&quot;FATAL_AND_INJ&quot;]</code></pre>
+<pre><code>##        FATAL_AND_INJ
+## 901700       12.6523</code></pre>
+<pre class="r"><code>timeallowfunc(oldestevent) - oldestevent[&quot;FATAL_AND_INJ&quot;]</code></pre>
+<pre><code>##       FATAL_AND_INJ
+## 28480             0</code></pre>
+<p>The differnce is substantial enough and thus the allowance will be added.</p>
+<pre class="r"><code>stormdatahealth$FAI_TIME_PEN &lt;- apply(stormdatahealth, 1, timeallowfunc)
+rm(timeallowfunc, oldestevent, newestevent, rmnegdate, timeco)
+head(stormdatahealth[,c(&quot;FATAL_AND_INJ&quot;, &quot;FAI_TIME_PEN&quot;)])</code></pre>
+<pre><code>##   FATAL_AND_INJ FAI_TIME_PEN
+## 1            15    15.058754
+## 3             2     2.231100
+## 4             2     2.291533
+## 5             2     2.381063
+## 6             6     6.381063
+## 7             1     1.381623</code></pre>
+<pre class="r"><code>tail(stormdatahealth[,c(&quot;FATAL_AND_INJ&quot;, &quot;FAI_TIME_PEN&quot;)])</code></pre>
+<pre><code>##        FATAL_AND_INJ FAI_TIME_PEN
+## 901862             1     13.65118
+## 901933             1     13.64111
+## 902003             1     13.64782
+## 902128             3     15.64223
+## 902129             1     13.64223
+## 902183             1     13.64279</code></pre>
+<div id="does-the-pentaly-impact-the-event-type-with-the-largest-impact" class="section level4">
+<h4>Does the pentaly impact the event type with the largest impact?</h4>
+<pre class="r"><code>penaltyeval &lt;- stormdatahealth %&gt;% group_by(EVTYPE) %&gt;% summarise(TOTAL = sum(FATAL_AND_INJ), TOTAL_W_PEN = sum(FAI_TIME_PEN))
+head(arrange(penaltyeval, desc(TOTAL_W_PEN)))</code></pre>
+<pre><code>## # A tibble: 6 x 3
+##   EVTYPE         TOTAL TOTAL_W_PEN
+##   &lt;fct&gt;          &lt;dbl&gt;       &lt;dbl&gt;
+## 1 TORNADO        96979     146905.
+## 2 LIGHTNING       6046      40834.
+## 3 TSTM WIND       7461      34669.
+## 4 EXCESSIVE HEAT  8428      15660.
+## 5 FLASH FLOOD     2755      12762.
+## 6 FLOOD           7259      11707.</code></pre>
+<pre class="r"><code>head(arrange(penaltyeval, desc(TOTAL)))</code></pre>
+<pre><code>## # A tibble: 6 x 3
+##   EVTYPE         TOTAL TOTAL_W_PEN
+##   &lt;fct&gt;          &lt;dbl&gt;       &lt;dbl&gt;
+## 1 TORNADO        96979     146905.
+## 2 EXCESSIVE HEAT  8428      15660.
+## 3 TSTM WIND       7461      34669.
+## 4 FLOOD           7259      11707.
+## 5 LIGHTNING       6046      40834.
+## 6 HEAT            3037       5409.</code></pre>
+<p>Although the pentaly does have an affect on the order in which the events should be considered to have the largest impact tornado clearly have the largest impact in both occasions.</p>
+<p>The impact of the zero measure might have impacted the decline even though this could also skew the results as more events are currently recorded than in previous years.</p>
+<pre class="r"><code>rm(penaltyeval)</code></pre>
+</div>
+</div>
+<div id="how-human-health-will-be-considered-for-this-study" class="section level3">
+<h3>How human health will be considered for this study</h3>
+<p>The comparing a human life to severe injury is contraversal and in the terms of the data the specific severity of injuries is not defined and the type widely varied so it can’t be defined even in a monetary way.</p>
+<p>Testing if changed the ratio of value place on death compared to injury affects the most harmful event type. To see if futher research would be worthwhile to give a clearer result.</p>
+<p>Since it is very difficult to define a ratio a broad range from 1:1 to 100:1 will be tested.</p>
+<p>Only the 20 event types with the highest health impact will be reviewed.</p>
+<pre class="r"><code>totalinjsperevent &lt;- stormdatahealth %&gt;% group_by(EVTYPE) %&gt;% summarise(TOTAL_FATAL = sum(FATALITIES), TOTAL_INJ = sum(INJURIES), TOTAL_FAI = sum(FATAL_AND_INJ))
+totalinjsperevent &lt;- arrange(totalinjsperevent, desc(TOTAL_FAI))[1:20,]
+head(totalinjsperevent)</code></pre>
+<pre><code>## # A tibble: 6 x 4
+##   EVTYPE         TOTAL_FATAL TOTAL_INJ TOTAL_FAI
+##   &lt;fct&gt;                &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;
+## 1 TORNADO               5633     91346     96979
+## 2 EXCESSIVE HEAT        1903      6525      8428
+## 3 TSTM WIND              504      6957      7461
+## 4 FLOOD                  470      6789      7259
+## 5 LIGHTNING              816      5230      6046
+## 6 HEAT                   937      2100      3037</code></pre>
+<p>Calculating data required for a normalized plot</p>
+<pre class="r"><code>#creating the x values, which will be the fatality to injury grading ratio
+injurygradingratio &lt;- c(1, seq(5,100, by = 5))
+#function for calulating the new grade based on the ratio
+ratio_calc &lt;- function(event_totals, xvalues){
+        total_fatals &lt;- as.numeric(event_totals[&quot;TOTAL_FATAL&quot;])
+        total_injuries &lt;- as.numeric(event_totals[&quot;TOTAL_INJ&quot;])
+        total_fatals * xvalues + total_injuries
+}
+graded_health_scores &lt;- apply(totalinjsperevent, 1, ratio_calc, xvalues = injurygradingratio)
+colnames(graded_health_scores) &lt;- totalinjsperevent$EVTYPE
+head(graded_health_scores)</code></pre>
+<pre><code>##      TORNADO EXCESSIVE HEAT TSTM WIND FLOOD LIGHTNING  HEAT FLASH FLOOD
+## [1,]   96979           8428      7461  7259      6046  3037        2755
+## [2,]  119511          16040      9477  9139      9310  6785        6667
+## [3,]  147676          25555     11997 11489     13390 11470       11557
+## [4,]  175841          35070     14517 13839     17470 16155       16447
+## [5,]  204006          44585     17037 16189     21550 20840       21337
+## [6,]  232171          54100     19557 18539     25630 25525       26227
+##      ICE STORM THUNDERSTORM WIND WINTER STORM HIGH WIND HAIL
+## [1,]      2064              1621         1527      1385 1376
+## [2,]      2420              2153         2351      2377 1436
+## [3,]      2865              2818         3381      3617 1511
+## [4,]      3310              3483         4411      4857 1586
+## [5,]      3755              4148         5441      6097 1661
+## [6,]      4200              4813         6471      7337 1736
+##      HURRICANE/TYPHOON HEAVY SNOW WILDFIRE THUNDERSTORM WINDS BLIZZARD
+## [1,]              1339       1148      986                972      906
+## [2,]              1595       1656     1286               1228     1310
+## [3,]              1915       2291     1661               1548     1815
+## [4,]              2235       2926     2036               1868     2320
+## [5,]              2555       3561     2411               2188     2825
+## [6,]              2875       4196     2786               2508     3330
+##       FOG RIP CURRENT WILD/FOREST FIRE
+## [1,]  796         600              557
+## [2,] 1044        2072              605
+## [3,] 1354        3912              665
+## [4,] 1664        5752              725
+## [5,] 1974        7592              785
+## [6,] 2284        9432              845</code></pre>
+<p>Melting the data frame in to x y cordinates and normalizing</p>
+<pre class="r"><code>event_type_count &lt;- ncol(graded_health_scores)
+graded_health_scores &lt;- melt(graded_health_scores)
+graded_health_scores$Var1 &lt;- rep(injurygradingratio, event_type_count)
+colnames(graded_health_scores) &lt;- c(&quot;ratio&quot;, &quot;event_type&quot;, &quot;scores&quot;)
+norm_graded_health_scores &lt;- graded_health_scores %&gt;% group_by(ratio) %&gt;% mutate_at(vars(scores), funs(scale(.) %&gt;% as.vector()) )
+head(norm_graded_health_scores)</code></pre>
+<pre><code>## # A tibble: 6 x 3
+## # Groups:   ratio [6]
+##   ratio event_type scores
+##   &lt;dbl&gt; &lt;fct&gt;       &lt;dbl&gt;
+## 1     1 TORNADO      4.22
+## 2     5 TORNADO      4.20
+## 3    10 TORNADO      4.17
+## 4    15 TORNADO      4.14
+## 5    20 TORNADO      4.12
+## 6    25 TORNADO      4.10</code></pre>
+<p>Plotting the effect of the ratio</p>
+<pre class="r"><code>p &lt;- ggplot(norm_graded_health_scores[1:105,], aes(x=ratio, y=scores, colour = event_type, group = event_type))
+p &lt;- p + geom_line()
+p &lt;- p + geom_point()
+p &lt;- p + labs( x = &quot;Ratio&quot;)
+p &lt;- p + labs(y = &quot;Impact to Human Health Score&quot;)
+p &lt;- p + ggtitle(&quot;Impact of changing the \nfatality:injury ratio&quot;)
+p</code></pre>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>From this plot we can see that how we ratio is not important in derterming the event type with the largest impact to human health.</p>
+</div>
+</div>
+<div id="question-2" class="section level2">
+<h2>Question 2</h2>
+<div id="which-type-of-events-have-the-greatest-econmic-consquence" class="section level3">
+<h3>Which type of events have the greatest econmic consquence?</h3>
+</div>
+<div id="considerations" class="section level3">
+<h3>Considerations</h3>
+<p>There a few things we might want to considerer when answering this question</p>
+<ul>
+<li><p>should there be an economic value set for the impacts to human health?</p></li>
+<li><p>do we need to account for inflation?</p></li>
+<li><p>the data set operates in good faith with cost estimates, with regulation there could be some discreptances</p></li>
+<li><p>are there null fields in the data and how should they be handled</p></li>
+</ul>
+<pre class="r"><code>sapply(stormdata, function(x){length(which(is.na(x)))})</code></pre>
+<pre><code>##             STATE__            BGN_DATE            BGN_TIME 
+##                   0                   0                   0 
+##           TIME_ZONE              COUNTY          COUNTYNAME 
+##                   0                   0                   0 
+##               STATE              EVTYPE           BGN_RANGE 
+##                   0                   0                   0 
+##             BGN_AZI          BGN_LOCATI            END_DATE 
+##                   0                   0                   0 
+##            END_TIME          COUNTY_END          COUNTYENDN 
+##                   0                   0              902297 
+##           END_RANGE             END_AZI          END_LOCATI 
+##                   0                   0                   0 
+##              LENGTH               WIDTH                   F 
+##                   0                   0              843563 
+##                 MAG          FATALITIES            INJURIES 
+##                   0                   0                   0 
+##             PROPDMG          PROPDMGEXP             CROPDMG 
+##                   0                   0                   0 
+##          CROPDMGEXP                 WFO          STATEOFFIC 
+##                   0                   0                   0 
+##           ZONENAMES            LATITUDE           LONGITUDE 
+##                   0                  47                   0 
+##          LATITUDE_E          LONGITUDE_             REMARKS 
+##                  40                   0                   0 
+##              REFNUM Property_damage_USD     Crop_damage_USD 
+##                   0                   0                   0 
+##        Total_damage       FATAL_AND_INJ 
+##                   0                   0</code></pre>
+<p>*without any NA values it is impossible to tell if zero estimates are accurate or just no information supplied. THis could require further analysis.</p>
+<ul>
+<li>other related costs such as debris clearing, fire fighting and personnel overtime charges are not included in these estimates</li>
+</ul>
+</div>
+<div id="assumptions-1" class="section level3">
+<h3>Assumptions</h3>
+<ul>
+<li><p>The study doesn’t specify if deaths and injury are caused directly or indirectly. For this reason they will be treated of the same value.</p></li>
+<li><p>The event type will grouped by event name</p></li>
+<li><p>Since an acurate prediction model for times in between freak event of certain event types isn’t available the assumption wil be made the same type and magnitude is as likely to reoccur as any other event type.</p></li>
+<li><p>human health will not be considered in this study as it is hard put a price value too and insurficent data is contained in this study</p></li>
+</ul>
+<p>*it would be possible to go through the event naratives to obtain additional costing in regards to more significant figure estimes. Since there isn’t a direct sentence structure stimpulated for data entry extraction would be too difficulat and time consuming for this study. Much of this data is likely missing anyway.</p>
+<p>*Inflation will not be accounted for in this analysis as fixed values are supplied for damages in the study and as such the damage estimates should not have increased over time for the same items.</p>
+</div>
+<div id="the-value-of-the-us-currency-over-time" class="section level3">
+<h3>The value of the US currency over time</h3>
+<p>Chosen to disregaurd inflation as noted above. Data is still included but not currently used.</p>
+<p>Inflation data will be added below and add a copy of the data will be available on the GitHub repository.</p>
+<p>This data was downloaded from the Federal Reserve Bank of St. Louis from <a href="https://fred.stlouisfed.org/series/FPCPITOTLZGUSA">this page</a>.</p>
+<p>The data available is from the year 1960 till 2016. Other years will be excluded due to lack of information</p>
+</div>
+<div id="adding-the-inflation-data" class="section level3">
+<h3>Adding the inflation data</h3>
+<pre class="r"><code>fileurl &lt;- &quot;https://fred.stlouisfed.org/graph/fredgraph.csv?chart_type=line&amp;recession_bars=on&amp;log_scales=&amp;bgcolor=%23e1e9f0&amp;graph_bgcolor=%23ffffff&amp;fo=Open+Sans&amp;ts=12&amp;tts=12&amp;txtcolor=%23444444&amp;show_legend=yes&amp;show_axis_titles=yes&amp;drp=0&amp;cosd=1960-01-01&amp;coed=2016-01-01&amp;height=450&amp;stacking=&amp;range=Custom&amp;mode=fred&amp;id=FPCPITOTLZGUSA&amp;transformation=lin&amp;nd=1960-01-01&amp;ost=-99999&amp;oet=99999&amp;lsv=&amp;lev=&amp;mma=0&amp;fml=a&amp;fgst=lin&amp;fgsnd=2009-06-01&amp;fq=Annual&amp;fam=avg&amp;vintage_date=&amp;revision_date=&amp;line_color=%234572a7&amp;line_style=solid&amp;lw=2&amp;scale=left&amp;mark_type=none&amp;mw=2&amp;width=749#&quot;
+filepath &lt;- &quot;./ProjectData/inflation.csv&quot;
+projectdatapath &lt;- &quot;./ProjectData&quot;
+if(!file.exists(filepath)){
+        if(!dir.exists(projectdatapath)){
+               dir.create(projectdatapath) 
+        }
+        download.file(fileurl, filepath)
+}
+rm(fileurl)</code></pre>
+<p>Add data to r</p>
+<pre class="r"><code>inflation_data &lt;- read.csv(filepath)
+head(inflation_data)</code></pre>
+<pre><code>##         DATE FPCPITOTLZGUSA
+## 1 1960-01-01       1.509929
+## 2 1961-01-01       1.075182
+## 3 1962-01-01       1.116071
+## 4 1963-01-01       1.214128
+## 5 1964-01-01       1.308615
+## 6 1965-01-01       1.668461</code></pre>
+</div>
+<div id="cleaning-the-inflation-data" class="section level3">
+<h3>Cleaning the inflation data</h3>
+<pre class="r"><code>inflation_data$DATE &lt;- as.Date(inflation_data$DATE)
+inflation_data$Year &lt;- lubridate::year(inflation_data$DATE)
+colnames(inflation_data) &lt;- c(&quot;Date&quot;, &quot;Inflation_rate&quot;,&quot;Year&quot;)
+head(inflation_data)</code></pre>
+<pre><code>##         Date Inflation_rate Year
+## 1 1960-01-01       1.509929 1960
+## 2 1961-01-01       1.075182 1961
+## 3 1962-01-01       1.116071 1962
+## 4 1963-01-01       1.214128 1963
+## 5 1964-01-01       1.308615 1964
+## 6 1965-01-01       1.668461 1965</code></pre>
+<p>Extracting the year from the date data in the storm data set</p>
+<pre class="r"><code>stormdata$Year &lt;- lubridate::year(stormdata$BGN_DATE)
+head(stormdata[,c(&quot;BGN_DATE&quot;, &quot;Year&quot;)])</code></pre>
+<pre><code>##     BGN_DATE Year
+## 1 1950-04-18 1950
+## 2 1950-04-18 1950
+## 3 1951-02-20 1951
+## 4 1951-06-08 1951
+## 5 1951-11-15 1951
+## 6 1951-11-15 1951</code></pre>
+<p>Calculating the accumlative inflation</p>
+<pre class="r"><code>cumlative_inflation = 0
+for(i in 1:nrow(inflation_data)){
+        
+}</code></pre>
+</div>
+<div id="creating-a-damage-data-sumary-grouped-by-event-type" class="section level3">
+<h3>Creating a damage data sumary grouped by event type</h3>
+<pre class="r"><code>#Due to an issue with grouping not working I needed to reattach the plyr and dplyr packages
+detach(package:plyr)
+detach(package:dplyr)
+library(plyr)</code></pre>
+<pre><code>## Warning: package 'plyr' was built under R version 3.5.1</code></pre>
+<pre><code>## 
+## Attaching package: 'plyr'</code></pre>
+<pre><code>## The following object is masked from 'package:lubridate':
+## 
+##     here</code></pre>
+<pre class="r"><code>library(dplyr)</code></pre>
+<pre><code>## Warning: package 'dplyr' was built under R version 3.5.1</code></pre>
+<pre><code>## 
+## Attaching package: 'dplyr'</code></pre>
+<pre><code>## The following objects are masked from 'package:plyr':
+## 
+##     arrange, count, desc, failwith, id, mutate, rename, summarise,
+##     summarize</code></pre>
+<pre><code>## The following objects are masked from 'package:lubridate':
+## 
+##     intersect, setdiff, union</code></pre>
+<pre><code>## The following objects are masked from 'package:stats':
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>Damages_by_event_type &lt;- group_by(stormdata, EVTYPE)
+Damages_by_event_type &lt;- summarize(Damages_by_event_type, Property_damage_USD = sum(Property_damage_USD), Crop_damage_USD = sum(Crop_damage_USD), Total_damage = sum(Total_damage))
+Damages_by_event_type &lt;- arrange(Damages_by_event_type, desc(Total_damage))
+head(Damages_by_event_type)</code></pre>
+<pre><code>## # A tibble: 6 x 4
+##   EVTYPE            Property_damage_USD Crop_damage_USD  Total_damage
+##   &lt;fct&gt;                           &lt;dbl&gt;           &lt;dbl&gt;         &lt;dbl&gt;
+## 1 FLOOD                   144657709807       5661968450 150319678257 
+## 2 HURRICANE/TYPHOON        69305840000       2607872800  71913712800 
+## 3 TORNADO                  56925660790.       414953270  57340614060.
+## 4 STORM SURGE              43323536000             5000  43323541000 
+## 5 HAIL                     15727367053.      3025537890  18752904943.
+## 6 FLASH FLOOD              16140812067.      1421317100  17562129167.</code></pre>
+<p>Reducing this data for plotting results, only the 20 event types with the largest cost will be shown.</p>
+<pre class="r"><code>Reduced_damages_by_event_type &lt;- Damages_by_event_type[1:20,] %&gt;% select(-Total_damage) %&gt;% rename(Event_type = EVTYPE)
+Reduced_damages_by_event_type$Event_type &lt;- with(Reduced_damages_by_event_type, factor(Event_type, Event_type))
+Reduced_damages_by_event_type &lt;- melt(Reduced_damages_by_event_type, id = &quot;Event_type&quot;)
+colnames(Reduced_damages_by_event_type) &lt;- c(&quot;Event_type&quot;, &quot;Damage_type&quot;, &quot;Cost_USD&quot;)
+Reduced_damages_by_event_type$Damage_type &lt;- factor(Reduced_damages_by_event_type$Damage_type, labels = c(&quot;Property&quot;, &quot;Crops&quot;))
+head(Reduced_damages_by_event_type)</code></pre>
+<pre><code>##          Event_type Damage_type     Cost_USD
+## 1             FLOOD    Property 144657709807
+## 2 HURRICANE/TYPHOON    Property  69305840000
+## 3           TORNADO    Property  56925660790
+## 4       STORM SURGE    Property  43323536000
+## 5              HAIL    Property  15727367053
+## 6       FLASH FLOOD    Property  16140812067</code></pre>
+</div>
+</div>
 </div>
 <div id="results" class="section level1">
 <h1>Results</h1>
+<div id="question-1---which-event-type-had-the-largest-impact-to-human-health" class="section level2">
+<h2>Question 1 - Which event type had the largest impact to human health?</h2>
+<p>Since putting a higher value on fatalities compared to injuries didn’t affect the outcome of the event type with the largest impact. Nor did calculation of a reducition in impact to human health in modern times. The output plot will simply contain some of the highest damage event types with the quanities of injuries and deaths.</p>
+<pre class="r"><code>totals &lt;- totalinjsperevent %&gt;% arrange(desc(TOTAL_FAI)) %&gt;% select(-TOTAL_FAI)
+totals &lt;- melt(totals, id.vars = &quot;EVTYPE&quot;, measure.vars = c(&quot;TOTAL_FATAL&quot;, &quot;TOTAL_INJ&quot;))
+colnames(totals) &lt;- c(&quot;event&quot;, &quot;injury_type&quot;,&quot;no_of_injuries&quot;)
+totals$injury_type &lt;- revalue(totals$injury_type, c( &quot;TOTAL_INJ&quot; = &quot;Injuries&quot;, &quot;TOTAL_FATAL&quot; = &quot;Fatalities&quot;))
+totals$event &lt;- factor(totals$event, levels = totalinjsperevent$EVTYPE)
+totals$injury_type &lt;- factor(totals$injury_type, c(&quot;Injuries&quot;, &quot;Fatalities&quot;))
+p &lt;- ggplot(totals, aes(x=event, y=no_of_injuries, fill = injury_type))
+p &lt;- p + geom_bar(stat = &quot;identity&quot;)
+p &lt;- p + scale_fill_manual(values=c(&quot;rosybrown&quot;, &quot;red3&quot;))
+p &lt;- p + guides(fill = guide_legend(reverse = FALSE, title = &quot;Type of Injury&quot;))
+p &lt;- p + labs( x = &quot;Event Type&quot;)
+p &lt;- p + labs(y = &quot;No. of people impacted&quot;)
+p &lt;- p + ggtitle(&quot;Impact of different events to human health&quot;)
+p &lt;- p + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+p</code></pre>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>It is clear that Tornados are the event type that has the greatest impact to human health. In both injurys and fatalities it is clearly the highest.</p>
+</div>
+<div id="question-2---across-the-united-states-which-types-of-events-have-the-greatest-economic-consequences" class="section level2">
+<h2>Question 2 - Across the United States, which types of events have the greatest economic consequences?</h2>
+<pre class="r"><code>p &lt;- ggplot(Reduced_damages_by_event_type, aes(x=Event_type, y=Cost_USD, fill = Damage_type))
+p &lt;- p + geom_bar(stat = &quot;identity&quot;)
+p &lt;- p + scale_fill_manual(values=c(&quot;rosybrown&quot;, &quot;red3&quot;))
+p &lt;- p + guides(fill = guide_legend(reverse = FALSE, title = &quot;Type of Damage&quot;))
+p &lt;- p + labs( x = &quot;Event Type&quot;)
+p &lt;- p + labs(y = &quot;Cost in Billions of USD&quot;)
+p &lt;- p + scale_y_continuous(labels = c(&quot;0&quot;,&quot;50&quot;,&quot;100&quot;,&quot;150&quot;))
+p &lt;- p + ggtitle(&quot;Economic damage of different event types&quot;)
+p &lt;- p + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+p</code></pre>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>It is clear that floods are the event type that cause the most economical damage.</p>
+<p>It is also clear that droughts cause the largest amount of crop damage.</p>
+<div id="reviewing-the-economic-value-of-a-life" class="section level3">
+<h3>Reviewing the Economic Value of a life</h3>
+<p>Looking at the economic value a life would need to have for Tornado to become the highest damage.</p>
+<pre class="r"><code>Flood_damage_cost &lt;- Damages_by_event_type %&gt;% filter(EVTYPE == &quot;FLOOD&quot;) %&gt;% select(Total_damage)
+Tornado_damage_cost &lt;- Damages_by_event_type %&gt;% filter(EVTYPE == &quot;TORNADO&quot;) %&gt;% select(Total_damage)
+Flood_fatalities &lt;- totalinjsperevent %&gt;% filter(EVTYPE == &quot;FLOOD&quot;) %&gt;% select(TOTAL_FATAL)
+Tornado_fatalities &lt;- totalinjsperevent %&gt;% filter(EVTYPE == &quot;TORNADO&quot;) %&gt;% select(TOTAL_FATAL)
+cost_per_life &lt;- (Tornado_damage_cost - Flood_damage_cost)/(Flood_fatalities - Tornado_fatalities)
+cost_per_life</code></pre>
+<pre><code>##   Total_damage
+## 1     18008728</code></pre>
+<p>I human life would need to have an economic value of over 18 Million before tornados caused the highest economical damage.</p>
+</div>
+</div>
 </div>
 
 

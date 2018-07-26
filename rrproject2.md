@@ -10,8 +10,26 @@ output:
 Synopsis
 ========
 
+Question 1 - Impact on human health
+--------------------------------------
 
+* Tornados have the most impact on human health
 
+* Tornados cause the greatest loss of life
+
+* Tornados cause the most injuries
+
+Question 2 - Largest economic cost
+----------------------------------
+
+* Floods cause the most economic damage
+
+* Floods cause the most property damage
+
+* Droughts cause the most crop damage
+
+**NOTE.** Figures are shown in the results section. 
+All calculations are shown in the data processing section.
 
 
 
@@ -81,6 +99,91 @@ sessionInfo()
 ## [13] digest_0.6.15   evaluate_0.11
 ```
 
+Loading Libraries
+-----------------
+
+```r
+library(plyr)
+```
+
+```
+## Warning: package 'plyr' was built under R version 3.5.1
+```
+
+```r
+library(dplyr)
+```
+
+```
+## Warning: package 'dplyr' was built under R version 3.5.1
+```
+
+```
+## 
+## Attaching package: 'dplyr'
+```
+
+```
+## The following objects are masked from 'package:plyr':
+## 
+##     arrange, count, desc, failwith, id, mutate, rename, summarise,
+##     summarize
+```
+
+```
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+```
+
+```
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+```
+
+```r
+library(reshape2)
+```
+
+```
+## Warning: package 'reshape2' was built under R version 3.5.1
+```
+
+```r
+library(ggplot2)
+```
+
+```
+## Warning: package 'ggplot2' was built under R version 3.5.1
+```
+
+```r
+library(lubridate)
+```
+
+```
+## Warning: package 'lubridate' was built under R version 3.5.1
+```
+
+```
+## 
+## Attaching package: 'lubridate'
+```
+
+```
+## The following object is masked from 'package:plyr':
+## 
+##     here
+```
+
+```
+## The following object is masked from 'package:base':
+## 
+##     date
+```
+
+
 
 Downloading Data from orginal source
 ------------------------------------
@@ -96,6 +199,7 @@ if(!file.exists(zippath)){
         }
         download.file(fileurl, zippath)
 }
+rm(fileurl)
 ```
 
 
@@ -104,6 +208,7 @@ Loading data into R
 
 ```r
 stormdata <- read.csv(zippath)
+rm(zippath)
 head(stormdata)
 ```
 
@@ -293,17 +398,782 @@ str(stormdata)
 ##  $ REFNUM    : num  1 2 3 4 5 6 7 8 9 10 ...
 ```
 
+Cleaning the data
+-----------------
+
+Converting the BGN_DATE to date format
+
+
+```r
+stormdata$BGN_DATE <- as.Date(stormdata$BGN_DATE, "%m/%d/%Y")
+str(stormdata$BGN_DATE)
+```
+
+```
+##  Date[1:902297], format: "1950-04-18" "1950-04-18" "1951-02-20" "1951-06-08" "1951-11-15" ...
+```
+
+Data on damage cost is provided as a 3 signifcant figure value and a expander letter 
+
+* K = 1 000
+
+* M = 1 000 000
+
+* B = 1 000 000 000
+
+Converting these values to numeric
+
+
+```r
+value_from_expander <- function(data, damage_type){
+        damage_type_exp <- paste(damage_type, "EXP", sep="")
+        damage_value <- as.numeric(data[damage_type])
+        damage_exp <- data[damage_type_exp]
+        if(damage_exp == "K"){
+                damage_value <- damage_value * 1000
+        } else if(damage_exp == "M"){
+                damage_value <- damage_value * 1000000
+        } else if(damage_exp == "B"){
+                damage_value <- damage_value * 1000000000
+        }
+        damage_value
+}
+stormdata$Property_damage_USD <- apply(stormdata, 1, value_from_expander, damage_type = "PROPDMG")
+stormdata$Crop_damage_USD <- apply(stormdata, 1, value_from_expander, damage_type = "CROPDMG")
+stormdata$Total_damage <- stormdata$Property_damage_USD + stormdata$Crop_damage_USD
+head(stormdata)
+```
+
+```
+##   STATE__   BGN_DATE BGN_TIME TIME_ZONE COUNTY COUNTYNAME STATE  EVTYPE
+## 1       1 1950-04-18     0130       CST     97     MOBILE    AL TORNADO
+## 2       1 1950-04-18     0145       CST      3    BALDWIN    AL TORNADO
+## 3       1 1951-02-20     1600       CST     57    FAYETTE    AL TORNADO
+## 4       1 1951-06-08     0900       CST     89    MADISON    AL TORNADO
+## 5       1 1951-11-15     1500       CST     43    CULLMAN    AL TORNADO
+## 6       1 1951-11-15     2000       CST     77 LAUDERDALE    AL TORNADO
+##   BGN_RANGE BGN_AZI BGN_LOCATI END_DATE END_TIME COUNTY_END COUNTYENDN
+## 1         0                                               0         NA
+## 2         0                                               0         NA
+## 3         0                                               0         NA
+## 4         0                                               0         NA
+## 5         0                                               0         NA
+## 6         0                                               0         NA
+##   END_RANGE END_AZI END_LOCATI LENGTH WIDTH F MAG FATALITIES INJURIES
+## 1         0                      14.0   100 3   0          0       15
+## 2         0                       2.0   150 2   0          0        0
+## 3         0                       0.1   123 2   0          0        2
+## 4         0                       0.0   100 2   0          0        2
+## 5         0                       0.0   150 2   0          0        2
+## 6         0                       1.5   177 2   0          0        6
+##   PROPDMG PROPDMGEXP CROPDMG CROPDMGEXP WFO STATEOFFIC ZONENAMES LATITUDE
+## 1    25.0          K       0                                         3040
+## 2     2.5          K       0                                         3042
+## 3    25.0          K       0                                         3340
+## 4     2.5          K       0                                         3458
+## 5     2.5          K       0                                         3412
+## 6     2.5          K       0                                         3450
+##   LONGITUDE LATITUDE_E LONGITUDE_ REMARKS REFNUM Property_damage_USD
+## 1      8812       3051       8806              1               25000
+## 2      8755          0          0              2                2500
+## 3      8742          0          0              3               25000
+## 4      8626          0          0              4                2500
+## 5      8642          0          0              5                2500
+## 6      8748          0          0              6                2500
+##   Crop_damage_USD Total_damage
+## 1               0        25000
+## 2               0         2500
+## 3               0        25000
+## 4               0         2500
+## 5               0         2500
+## 6               0         2500
+```
+
+
+Question 1 - Which types of events are most harmful to human health
+-----------------------------------------------------------------------
+
+This question could be interepted in several ways, some things to consider
+
+* human health could be considered in the following ways:
+        + the most people effected
+        + only permant effects considered
+        + only direct fatalities considered
+        + a different scoring for direct and indirect fatalities/injuries
+        +a different scoring for fatalities and injuries
+* classification of event type could be considered in the following ways:
+        + Event Name
+        + Designator
+* is there more data available for certain event types and thus could the results be skewed?
+* advancements in warning systems may have reduce the damage of particular event types in more recent years, should this be a consideration?
+* should the most extreme cases be included or valued the same?
+* will the population suffer the same impact from the same event as in previous times
+
+### Assumptions 
+
+* The study doesn't specify if deaths and injury are caused directly or indirectly. For this reason they will be treated of the same value. 
+
+* The event type will grouped by event name
+
+* Since an acurate prediction model for times in between freak event of certain event types isn't available the assumption wil be made the same type and magnitude is as likely to reoccur as any other event type. 
+
+### Have the damage of unusual natural effects changed over time
+
+If there is a correlation between time and the effect in regards to death and injury this should be account for. 
+
+Linear regression will be used, if a p value of less than 0.02 is found then a allowance based on the regression will be used.
+
+This should correlation should include the advancements in any warning systems over time. 
+
+Adding a sum of deaths and injuries to the data. New column will be called FATAL_AND_INJ
+
+
+```r
+stormdata <- stormdata %>% mutate(FATAL_AND_INJ = FATALITIES + INJURIES)
+```
+
+```
+## Warning: package 'bindrcpp' was built under R version 3.5.1
+```
+
+```r
+head(stormdata[,c("FATALITIES","INJURIES","FATAL_AND_INJ")])
+```
+
+```
+##   FATALITIES INJURIES FATAL_AND_INJ
+## 1          0       15            15
+## 2          0        0             0
+## 3          0        2             2
+## 4          0        2             2
+## 5          0        2             2
+## 6          0        6             6
+```
+
+Creating a liner regresion model to evaulate the correlation.
+
+Due to the data size and my limited computing power I have had to remove all events that have resulted in no fatalities or injuries for the human health question.
+
+
+
+```r
+stormdatahealth <- stormdata[stormdata$FATAL_AND_INJ > 0,]
+lminjovertime <- lm(FATAL_AND_INJ ~ BGN_DATE, stormdatahealth)
+summary(lminjovertime)
+```
+
+```
+## 
+## Call:
+## lm(formula = FATAL_AND_INJ ~ BGN_DATE, data = stormdatahealth)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+##  -15.00   -5.72   -4.05   -2.40 1731.98 
+## 
+## Coefficients:
+##               Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)  1.191e+01  4.501e-01   26.47   <2e-16 ***
+## BGN_DATE    -5.596e-04  4.407e-05  -12.70   <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 35.91 on 21927 degrees of freedom
+## Multiple R-squared:  0.0073,	Adjusted R-squared:  0.007255 
+## F-statistic: 161.2 on 1 and 21927 DF,  p-value: < 2.2e-16
+```
+
+Time seems to be coralated to the number of deaths and injurys with a reduction in injuries over time. Thus a pentaly should be given based on the the linear regresion. The total fatalities and injuries will be adjusted using the BGN_DATE coefficient from this model and added to a new variable called FAI_TIME_PEN. 
+
+Another adjust has been made so the pental startes at 0 otherwise the earlier values would be negatives.
+
+The coefficent has been reverse to allow add a pentaly to newer events rather than substracting from the older events
+
+Checking there is a significant difference over time.
+
+
+```r
+timeco <- -as.numeric(lminjovertime$coefficients[2])
+rm(lminjovertime)
+rmnegdate <- -as.numeric(min(stormdatahealth$BGN_DATE))
+#apply seems to extract each variable as character so the as.Date neeeded to be reapplied, this wouldn't be required otherwise
+timeallowfunc <- function(x) {
+        if(class(x[["BGN_DATE"]]) != "Date"){
+             dateasnum <- as.numeric(as.Date(x["BGN_DATE"]))   
+        } else {
+                dateasnum <- as.numeric(x["BGN_DATE"])
+        }
+        
+        totalhurt <- as.numeric(x["FATAL_AND_INJ"])
+        totalhurt + (dateasnum + rmnegdate) * timeco
+}
+oldestevent <- stormdatahealth[which.min(stormdatahealth$BGN_DATE),]
+newestevent <- stormdatahealth[which.max(stormdatahealth$BGN_DATE),]
+timeallowfunc(newestevent) - newestevent["FATAL_AND_INJ"]
+```
+
+```
+##        FATAL_AND_INJ
+## 901700       12.6523
+```
+
+```r
+timeallowfunc(oldestevent) - oldestevent["FATAL_AND_INJ"]
+```
+
+```
+##       FATAL_AND_INJ
+## 28480             0
+```
+
+The differnce is substantial enough and thus the allowance will be added. 
+
+
+```r
+stormdatahealth$FAI_TIME_PEN <- apply(stormdatahealth, 1, timeallowfunc)
+rm(timeallowfunc, oldestevent, newestevent, rmnegdate, timeco)
+head(stormdatahealth[,c("FATAL_AND_INJ", "FAI_TIME_PEN")])
+```
+
+```
+##   FATAL_AND_INJ FAI_TIME_PEN
+## 1            15    15.058754
+## 3             2     2.231100
+## 4             2     2.291533
+## 5             2     2.381063
+## 6             6     6.381063
+## 7             1     1.381623
+```
+
+```r
+tail(stormdatahealth[,c("FATAL_AND_INJ", "FAI_TIME_PEN")])
+```
+
+```
+##        FATAL_AND_INJ FAI_TIME_PEN
+## 901862             1     13.65118
+## 901933             1     13.64111
+## 902003             1     13.64782
+## 902128             3     15.64223
+## 902129             1     13.64223
+## 902183             1     13.64279
+```
+
+#### Does the pentaly impact the event type with the largest impact?
+
+
+```r
+penaltyeval <- stormdatahealth %>% group_by(EVTYPE) %>% summarise(TOTAL = sum(FATAL_AND_INJ), TOTAL_W_PEN = sum(FAI_TIME_PEN))
+head(arrange(penaltyeval, desc(TOTAL_W_PEN)))
+```
+
+```
+## # A tibble: 6 x 3
+##   EVTYPE         TOTAL TOTAL_W_PEN
+##   <fct>          <dbl>       <dbl>
+## 1 TORNADO        96979     146905.
+## 2 LIGHTNING       6046      40834.
+## 3 TSTM WIND       7461      34669.
+## 4 EXCESSIVE HEAT  8428      15660.
+## 5 FLASH FLOOD     2755      12762.
+## 6 FLOOD           7259      11707.
+```
+
+```r
+head(arrange(penaltyeval, desc(TOTAL)))
+```
+
+```
+## # A tibble: 6 x 3
+##   EVTYPE         TOTAL TOTAL_W_PEN
+##   <fct>          <dbl>       <dbl>
+## 1 TORNADO        96979     146905.
+## 2 EXCESSIVE HEAT  8428      15660.
+## 3 TSTM WIND       7461      34669.
+## 4 FLOOD           7259      11707.
+## 5 LIGHTNING       6046      40834.
+## 6 HEAT            3037       5409.
+```
+
+Although the pentaly does have an affect on the order in which the events should be considered to have the largest impact tornado clearly have the largest impact in both occasions.
+
+The impact of the zero measure might have impacted the decline even though this could also skew the results as more events are currently recorded than in previous years. 
+
+
+```r
+rm(penaltyeval)
+```
+
+### How human health will be considered for this study
+
+The comparing a human life to severe injury is contraversal and in the terms of the data the specific severity of injuries is not defined and the type widely varied so it can't be defined even in a monetary way.
+
+Testing if changed the ratio of value place on death compared to injury affects the most harmful event type. To see if futher research would be worthwhile to give a clearer result. 
+
+Since it is very difficult to define a ratio a broad range from 1:1 to 100:1 will be tested. 
+
+Only the 20 event types with the highest health impact will be reviewed.
+
+
+```r
+totalinjsperevent <- stormdatahealth %>% group_by(EVTYPE) %>% summarise(TOTAL_FATAL = sum(FATALITIES), TOTAL_INJ = sum(INJURIES), TOTAL_FAI = sum(FATAL_AND_INJ))
+totalinjsperevent <- arrange(totalinjsperevent, desc(TOTAL_FAI))[1:20,]
+head(totalinjsperevent)
+```
+
+```
+## # A tibble: 6 x 4
+##   EVTYPE         TOTAL_FATAL TOTAL_INJ TOTAL_FAI
+##   <fct>                <dbl>     <dbl>     <dbl>
+## 1 TORNADO               5633     91346     96979
+## 2 EXCESSIVE HEAT        1903      6525      8428
+## 3 TSTM WIND              504      6957      7461
+## 4 FLOOD                  470      6789      7259
+## 5 LIGHTNING              816      5230      6046
+## 6 HEAT                   937      2100      3037
+```
+
+Calculating data required for a normalized plot
+
+
+```r
+#creating the x values, which will be the fatality to injury grading ratio
+injurygradingratio <- c(1, seq(5,100, by = 5))
+#function for calulating the new grade based on the ratio
+ratio_calc <- function(event_totals, xvalues){
+        total_fatals <- as.numeric(event_totals["TOTAL_FATAL"])
+        total_injuries <- as.numeric(event_totals["TOTAL_INJ"])
+        total_fatals * xvalues + total_injuries
+}
+graded_health_scores <- apply(totalinjsperevent, 1, ratio_calc, xvalues = injurygradingratio)
+colnames(graded_health_scores) <- totalinjsperevent$EVTYPE
+head(graded_health_scores)
+```
+
+```
+##      TORNADO EXCESSIVE HEAT TSTM WIND FLOOD LIGHTNING  HEAT FLASH FLOOD
+## [1,]   96979           8428      7461  7259      6046  3037        2755
+## [2,]  119511          16040      9477  9139      9310  6785        6667
+## [3,]  147676          25555     11997 11489     13390 11470       11557
+## [4,]  175841          35070     14517 13839     17470 16155       16447
+## [5,]  204006          44585     17037 16189     21550 20840       21337
+## [6,]  232171          54100     19557 18539     25630 25525       26227
+##      ICE STORM THUNDERSTORM WIND WINTER STORM HIGH WIND HAIL
+## [1,]      2064              1621         1527      1385 1376
+## [2,]      2420              2153         2351      2377 1436
+## [3,]      2865              2818         3381      3617 1511
+## [4,]      3310              3483         4411      4857 1586
+## [5,]      3755              4148         5441      6097 1661
+## [6,]      4200              4813         6471      7337 1736
+##      HURRICANE/TYPHOON HEAVY SNOW WILDFIRE THUNDERSTORM WINDS BLIZZARD
+## [1,]              1339       1148      986                972      906
+## [2,]              1595       1656     1286               1228     1310
+## [3,]              1915       2291     1661               1548     1815
+## [4,]              2235       2926     2036               1868     2320
+## [5,]              2555       3561     2411               2188     2825
+## [6,]              2875       4196     2786               2508     3330
+##       FOG RIP CURRENT WILD/FOREST FIRE
+## [1,]  796         600              557
+## [2,] 1044        2072              605
+## [3,] 1354        3912              665
+## [4,] 1664        5752              725
+## [5,] 1974        7592              785
+## [6,] 2284        9432              845
+```
+
+
+Melting the data frame in to x y cordinates and normalizing
+
+
+```r
+event_type_count <- ncol(graded_health_scores)
+graded_health_scores <- melt(graded_health_scores)
+graded_health_scores$Var1 <- rep(injurygradingratio, event_type_count)
+colnames(graded_health_scores) <- c("ratio", "event_type", "scores")
+norm_graded_health_scores <- graded_health_scores %>% group_by(ratio) %>% mutate_at(vars(scores), funs(scale(.) %>% as.vector()) )
+head(norm_graded_health_scores)
+```
+
+```
+## # A tibble: 6 x 3
+## # Groups:   ratio [6]
+##   ratio event_type scores
+##   <dbl> <fct>       <dbl>
+## 1     1 TORNADO      4.22
+## 2     5 TORNADO      4.20
+## 3    10 TORNADO      4.17
+## 4    15 TORNADO      4.14
+## 5    20 TORNADO      4.12
+## 6    25 TORNADO      4.10
+```
+
+Plotting the effect of the ratio
+
+
+```r
+p <- ggplot(norm_graded_health_scores[1:105,], aes(x=ratio, y=scores, colour = event_type, group = event_type))
+p <- p + geom_line()
+p <- p + geom_point()
+p <- p + labs( x = "Ratio")
+p <- p + labs(y = "Impact to Human Health Score")
+p <- p + ggtitle("Impact of changing the \nfatality:injury ratio")
+p
+```
+
+![](rrproject2_files/figure-html/unnamed-chunk-16-1.png)<!-- -->
+
+From this plot we can see that how we ratio is not important in derterming the event type with the largest impact to human health.
+
+Question 2
+----------
+
+###Which type of events have the greatest econmic consquence?
+
+###Considerations
+
+There a few things we might want to considerer when answering this question
+
+* should there be an economic value set for the impacts to human health?
+
+* do we need to account for inflation?
+
+* the data set operates in good faith with cost estimates, with regulation there could be some discreptances
+
+* are there null fields in the data and how should they be handled
+
+
+```r
+sapply(stormdata, function(x){length(which(is.na(x)))})
+```
+
+```
+##             STATE__            BGN_DATE            BGN_TIME 
+##                   0                   0                   0 
+##           TIME_ZONE              COUNTY          COUNTYNAME 
+##                   0                   0                   0 
+##               STATE              EVTYPE           BGN_RANGE 
+##                   0                   0                   0 
+##             BGN_AZI          BGN_LOCATI            END_DATE 
+##                   0                   0                   0 
+##            END_TIME          COUNTY_END          COUNTYENDN 
+##                   0                   0              902297 
+##           END_RANGE             END_AZI          END_LOCATI 
+##                   0                   0                   0 
+##              LENGTH               WIDTH                   F 
+##                   0                   0              843563 
+##                 MAG          FATALITIES            INJURIES 
+##                   0                   0                   0 
+##             PROPDMG          PROPDMGEXP             CROPDMG 
+##                   0                   0                   0 
+##          CROPDMGEXP                 WFO          STATEOFFIC 
+##                   0                   0                   0 
+##           ZONENAMES            LATITUDE           LONGITUDE 
+##                   0                  47                   0 
+##          LATITUDE_E          LONGITUDE_             REMARKS 
+##                  40                   0                   0 
+##              REFNUM Property_damage_USD     Crop_damage_USD 
+##                   0                   0                   0 
+##        Total_damage       FATAL_AND_INJ 
+##                   0                   0
+```
+
+
+*without any NA values it is impossible to tell if zero estimates are accurate or just no information supplied. THis could require further analysis.
+
+* other related costs such as debris clearing, fire fighting and personnel overtime charges are not included in these estimates
+
+
+### Assumptions 
+
+* The study doesn't specify if deaths and injury are caused directly or indirectly. For this reason they will be treated of the same value. 
+
+* The event type will grouped by event name
+
+* Since an acurate prediction model for times in between freak event of certain event types isn't available the assumption wil be made the same type and magnitude is as likely to reoccur as any other event type. 
+
+* human health will not be considered in this study as it is hard put a price value too and insurficent data is contained in this study
+
+*it would be possible to go through the event naratives to obtain additional costing in regards to more significant figure estimes. Since there isn't a direct sentence structure stimpulated for data entry extraction would be too difficulat and time consuming for this study. Much of this data is likely missing anyway.
+
+*Inflation will not be accounted for in this analysis as fixed values are supplied for damages in the study and as such the damage estimates should not have increased over time for the same items.
+
+### The value of the US currency over time
+
+Chosen to disregaurd inflation as noted above. Data is still included but not currently used. 
+
+Inflation data will be added below and add a copy of the data will be available on the GitHub repository.
+
+This data was downloaded from the Federal Reserve Bank of St. Louis from [this page](https://fred.stlouisfed.org/series/FPCPITOTLZGUSA). 
+
+The data available is from the year 1960 till 2016. Other years will be excluded due to lack of information
+
+### Adding the inflation data
+
+
+
+```r
+fileurl <- "https://fred.stlouisfed.org/graph/fredgraph.csv?chart_type=line&recession_bars=on&log_scales=&bgcolor=%23e1e9f0&graph_bgcolor=%23ffffff&fo=Open+Sans&ts=12&tts=12&txtcolor=%23444444&show_legend=yes&show_axis_titles=yes&drp=0&cosd=1960-01-01&coed=2016-01-01&height=450&stacking=&range=Custom&mode=fred&id=FPCPITOTLZGUSA&transformation=lin&nd=1960-01-01&ost=-99999&oet=99999&lsv=&lev=&mma=0&fml=a&fgst=lin&fgsnd=2009-06-01&fq=Annual&fam=avg&vintage_date=&revision_date=&line_color=%234572a7&line_style=solid&lw=2&scale=left&mark_type=none&mw=2&width=749#"
+filepath <- "./ProjectData/inflation.csv"
+projectdatapath <- "./ProjectData"
+if(!file.exists(filepath)){
+        if(!dir.exists(projectdatapath)){
+               dir.create(projectdatapath) 
+        }
+        download.file(fileurl, filepath)
+}
+rm(fileurl)
+```
+
+Add data to r
+
+
+```r
+inflation_data <- read.csv(filepath)
+head(inflation_data)
+```
+
+```
+##         DATE FPCPITOTLZGUSA
+## 1 1960-01-01       1.509929
+## 2 1961-01-01       1.075182
+## 3 1962-01-01       1.116071
+## 4 1963-01-01       1.214128
+## 5 1964-01-01       1.308615
+## 6 1965-01-01       1.668461
+```
+
+### Cleaning the inflation data
+
+
+```r
+inflation_data$DATE <- as.Date(inflation_data$DATE)
+inflation_data$Year <- lubridate::year(inflation_data$DATE)
+colnames(inflation_data) <- c("Date", "Inflation_rate","Year")
+head(inflation_data)
+```
+
+```
+##         Date Inflation_rate Year
+## 1 1960-01-01       1.509929 1960
+## 2 1961-01-01       1.075182 1961
+## 3 1962-01-01       1.116071 1962
+## 4 1963-01-01       1.214128 1963
+## 5 1964-01-01       1.308615 1964
+## 6 1965-01-01       1.668461 1965
+```
+
+Extracting the year from the date data in the storm data set
+
+
+```r
+stormdata$Year <- lubridate::year(stormdata$BGN_DATE)
+head(stormdata[,c("BGN_DATE", "Year")])
+```
+
+```
+##     BGN_DATE Year
+## 1 1950-04-18 1950
+## 2 1950-04-18 1950
+## 3 1951-02-20 1951
+## 4 1951-06-08 1951
+## 5 1951-11-15 1951
+## 6 1951-11-15 1951
+```
+
+Calculating the accumlative inflation
+
+
+```r
+cumlative_inflation = 0
+for(i in 1:nrow(inflation_data)){
+        
+}
+```
+
+###Creating a damage data sumary grouped by event type
+
+
+```r
+#Due to an issue with grouping not working I needed to reattach the plyr and dplyr packages
+detach(package:plyr)
+detach(package:dplyr)
+library(plyr)
+```
+
+```
+## Warning: package 'plyr' was built under R version 3.5.1
+```
+
+```
+## 
+## Attaching package: 'plyr'
+```
+
+```
+## The following object is masked from 'package:lubridate':
+## 
+##     here
+```
+
+```r
+library(dplyr)
+```
+
+```
+## Warning: package 'dplyr' was built under R version 3.5.1
+```
+
+```
+## 
+## Attaching package: 'dplyr'
+```
+
+```
+## The following objects are masked from 'package:plyr':
+## 
+##     arrange, count, desc, failwith, id, mutate, rename, summarise,
+##     summarize
+```
+
+```
+## The following objects are masked from 'package:lubridate':
+## 
+##     intersect, setdiff, union
+```
+
+```
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+```
+
+```
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+```
+
+```r
+Damages_by_event_type <- group_by(stormdata, EVTYPE)
+Damages_by_event_type <- summarize(Damages_by_event_type, Property_damage_USD = sum(Property_damage_USD), Crop_damage_USD = sum(Crop_damage_USD), Total_damage = sum(Total_damage))
+Damages_by_event_type <- arrange(Damages_by_event_type, desc(Total_damage))
+head(Damages_by_event_type)
+```
+
+```
+## # A tibble: 6 x 4
+##   EVTYPE            Property_damage_USD Crop_damage_USD  Total_damage
+##   <fct>                           <dbl>           <dbl>         <dbl>
+## 1 FLOOD                   144657709807       5661968450 150319678257 
+## 2 HURRICANE/TYPHOON        69305840000       2607872800  71913712800 
+## 3 TORNADO                  56925660790.       414953270  57340614060.
+## 4 STORM SURGE              43323536000             5000  43323541000 
+## 5 HAIL                     15727367053.      3025537890  18752904943.
+## 6 FLASH FLOOD              16140812067.      1421317100  17562129167.
+```
+
+Reducing this data for plotting results, only the 20 event types with the largest cost will be shown.
+
+
+```r
+Reduced_damages_by_event_type <- Damages_by_event_type[1:20,] %>% select(-Total_damage) %>% rename(Event_type = EVTYPE)
+Reduced_damages_by_event_type$Event_type <- with(Reduced_damages_by_event_type, factor(Event_type, Event_type))
+Reduced_damages_by_event_type <- melt(Reduced_damages_by_event_type, id = "Event_type")
+colnames(Reduced_damages_by_event_type) <- c("Event_type", "Damage_type", "Cost_USD")
+Reduced_damages_by_event_type$Damage_type <- factor(Reduced_damages_by_event_type$Damage_type, labels = c("Property", "Crops"))
+head(Reduced_damages_by_event_type)
+```
+
+```
+##          Event_type Damage_type     Cost_USD
+## 1             FLOOD    Property 144657709807
+## 2 HURRICANE/TYPHOON    Property  69305840000
+## 3           TORNADO    Property  56925660790
+## 4       STORM SURGE    Property  43323536000
+## 5              HAIL    Property  15727367053
+## 6       FLASH FLOOD    Property  16140812067
+```
 
 
 
 Results
 =======
 
+Question 1 - Which event type had the largest impact to human health?
+-----------------------------------------------------------------------
+
+Since putting a higher value on fatalities compared to injuries didn't affect the outcome of the event type with the largest impact. Nor did calculation of a reducition in impact to human health in modern times. The output plot will simply contain some of the highest damage event types with the quanities of injuries and deaths.
+
+
+
+```r
+totals <- totalinjsperevent %>% arrange(desc(TOTAL_FAI)) %>% select(-TOTAL_FAI)
+totals <- melt(totals, id.vars = "EVTYPE", measure.vars = c("TOTAL_FATAL", "TOTAL_INJ"))
+colnames(totals) <- c("event", "injury_type","no_of_injuries")
+totals$injury_type <- revalue(totals$injury_type, c( "TOTAL_INJ" = "Injuries", "TOTAL_FATAL" = "Fatalities"))
+totals$event <- factor(totals$event, levels = totalinjsperevent$EVTYPE)
+totals$injury_type <- factor(totals$injury_type, c("Injuries", "Fatalities"))
+p <- ggplot(totals, aes(x=event, y=no_of_injuries, fill = injury_type))
+p <- p + geom_bar(stat = "identity")
+p <- p + scale_fill_manual(values=c("rosybrown", "red3"))
+p <- p + guides(fill = guide_legend(reverse = FALSE, title = "Type of Injury"))
+p <- p + labs( x = "Event Type")
+p <- p + labs(y = "No. of people impacted")
+p <- p + ggtitle("Impact of different events to human health")
+p <- p + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+p
+```
+
+![](rrproject2_files/figure-html/unnamed-chunk-25-1.png)<!-- -->
+
+
+It is clear that Tornados are the event type that has the greatest impact to human health. In both injurys and fatalities it is clearly the highest. 
+
+Question 2 - Across the United States, which types of events have the greatest economic consequences?
+---------------------------------------------------------------------------------------------------------
 
 
 
 
+```r
+p <- ggplot(Reduced_damages_by_event_type, aes(x=Event_type, y=Cost_USD, fill = Damage_type))
+p <- p + geom_bar(stat = "identity")
+p <- p + scale_fill_manual(values=c("rosybrown", "red3"))
+p <- p + guides(fill = guide_legend(reverse = FALSE, title = "Type of Damage"))
+p <- p + labs( x = "Event Type")
+p <- p + labs(y = "Cost in Billions of USD")
+p <- p + scale_y_continuous(labels = c("0","50","100","150"))
+p <- p + ggtitle("Economic damage of different event types")
+p <- p + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+p
+```
 
+![](rrproject2_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
+
+It is clear that floods are the event type that cause the most economical damage.
+
+It is also clear that droughts cause the largest amount of crop damage.
+
+### Reviewing the Economic Value of a life
+
+Looking at the economic value a life would need to have for Tornado to become the highest damage.
+
+
+```r
+Flood_damage_cost <- Damages_by_event_type %>% filter(EVTYPE == "FLOOD") %>% select(Total_damage)
+Tornado_damage_cost <- Damages_by_event_type %>% filter(EVTYPE == "TORNADO") %>% select(Total_damage)
+Flood_fatalities <- totalinjsperevent %>% filter(EVTYPE == "FLOOD") %>% select(TOTAL_FATAL)
+Tornado_fatalities <- totalinjsperevent %>% filter(EVTYPE == "TORNADO") %>% select(TOTAL_FATAL)
+cost_per_life <- (Tornado_damage_cost - Flood_damage_cost)/(Flood_fatalities - Tornado_fatalities)
+cost_per_life
+```
+
+```
+##   Total_damage
+## 1     18008728
+```
+
+I human life would need to have an economic value of over 18 Million before tornados caused the highest economical damage.
 
 
 

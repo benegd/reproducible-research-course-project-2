@@ -1,7 +1,7 @@
 base
-methods
-datasets
-utils
-grDevices
-graphics
-stats
+plyr
+dplyr
+reshape2
+ggplot2
+lubridate
+bindrcpp
