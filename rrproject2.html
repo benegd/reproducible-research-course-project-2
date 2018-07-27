@@ -134,7 +134,7 @@ $(document).ready(function () {
 <div id="question-1---impact-on-human-health" class="section level2">
 <h2>Question 1 - Impact on human health</h2>
 <ul>
-<li><p>Tornados have the most impact on human health</p></li>
+<li><p>Tornados have the largest impact on human health</p></li>
 <li><p>Tornados cause the greatest loss of life</p></li>
 <li><p>Tornados cause the most injuries</p></li>
 </ul>
@@ -152,10 +152,13 @@ $(document).ready(function () {
 <div id="project-goal" class="section level1">
 <h1>Project Goal</h1>
 <p>Use the data to answer some basic questions about severe weather events.</p>
-<p>Questions: 1. Across the United States, which types of events (as indicated in the <span style="color:red" face="KaTeX_Typewriter">EVTYPE</span> variable) are most harmful with respect to population health?</p>
-<ol start="2" style="list-style-type: decimal">
-<li>Across the United States, which types of events have the greatest economic consequences?</li>
+<div id="questions" class="section level2">
+<h2>Questions:</h2>
+<ol style="list-style-type: decimal">
+<li><p>Across the United States, which types of events (as indicated in the <span style="color:red" face="KaTeX_Typewriter">EVTYPE</span> variable) are most harmful with respect to population health?</p></li>
+<li><p>Across the United States, which types of events have the greatest economic consequences?</p></li>
 </ol>
+</div>
 </div>
 <div id="data-processing" class="section level1">
 <h1>Data Processing</h1>
@@ -164,7 +167,7 @@ $(document).ready(function () {
 <p>Copy of the data can be found in the <a href="https://github.com/benegd/reproducible-research-course-project-2">GitHub directory</a>.</p>
 <p>Data retrived from the <a href="https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2">here</a></p>
 <p>This project is part of the data science specialization course by John Hopkins University hosted by <a href="https://www.coursera.com/">Coursera</a>.</p>
-<p>Consult README.md for more information</p>
+<p>Consult README.md for more information about the project.</p>
 </div>
 <div id="system-info" class="section level2">
 <h2>System info</h2>
@@ -222,8 +225,8 @@ $(document).ready(function () {
 ## 
 ##     date</code></pre>
 </div>
-<div id="downloading-data-from-orginal-source" class="section level2">
-<h2>Downloading Data from orginal source</h2>
+<div id="downloading-data-from-the-orginal-source" class="section level2">
+<h2>Downloading Data from the orginal source</h2>
 <pre class="r"><code>fileurl &lt;- &quot;https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2&quot;
 zippath &lt;- &quot;./ProjectData/Storm_data.csv.bz2&quot;
 projectdatapath &lt;- &quot;./ProjectData&quot;
@@ -235,8 +238,8 @@ if(!file.exists(zippath)){
 }
 rm(fileurl)</code></pre>
 </div>
-<div id="loading-data-into-r" class="section level2">
-<h2>Loading data into R</h2>
+<div id="loading-the-data-into-r" class="section level2">
+<h2>Loading the data into R</h2>
 <pre class="r"><code>stormdata &lt;- read.csv(zippath)
 rm(zippath)
 head(stormdata)</code></pre>
@@ -414,33 +417,52 @@ head(stormdata)</code></pre>
 </div>
 <div id="cleaning-the-data" class="section level2">
 <h2>Cleaning the data</h2>
-<p>Converting the BGN_DATE to date format</p>
+<p>Converting the BGN_DATE to date format.</p>
 <pre class="r"><code>stormdata$BGN_DATE &lt;- as.Date(stormdata$BGN_DATE, &quot;%m/%d/%Y&quot;)
 str(stormdata$BGN_DATE)</code></pre>
 <pre><code>##  Date[1:902297], format: &quot;1950-04-18&quot; &quot;1950-04-18&quot; &quot;1951-02-20&quot; &quot;1951-06-08&quot; &quot;1951-11-15&quot; ...</code></pre>
-<p>Data on damage cost is provided as a 3 signifcant figure value and a expander letter</p>
+<p>Data on damage cost is provided as a 3 signifcant figure value and a expander letter.</p>
 <ul>
 <li><p>K = 1 000</p></li>
 <li><p>M = 1 000 000</p></li>
 <li><p>B = 1 000 000 000</p></li>
 </ul>
-<p>Converting these values to numeric</p>
+<p>Check if the values provided match the documentation.</p>
+<pre class="r"><code>unique(stormdata$CROPDMGEXP)</code></pre>
+<pre><code>## [1]   M K m B ? 0 k 2
+## Levels:  ? 0 2 B k K m M</code></pre>
+<pre class="r"><code>unique(stormdata$CROPDMGEXP)</code></pre>
+<pre><code>## [1]   M K m B ? 0 k 2
+## Levels:  ? 0 2 B k K m M</code></pre>
+<p>Both these these sets have values which don’t match. There is no infomation on process these values. I will use the values as follows.</p>
+<ul>
+<li><p>Lowercase letters - Indicate the same as the Uppercase letters</p></li>
+<li><p>? - Indicates an NA value</p></li>
+<li><p>“+”, “-” - Will be ignored</p></li>
+<li><p>postive intergers - Will be mutipled by the value using 10^x. Where x is the positive interger.</p></li>
+</ul>
+<p>Converting these values to numeric totals.</p>
 <pre class="r"><code>value_from_expander &lt;- function(data, damage_type){
         damage_type_exp &lt;- paste(damage_type, &quot;EXP&quot;, sep=&quot;&quot;)
         damage_value &lt;- as.numeric(data[damage_type])
         damage_exp &lt;- data[damage_type_exp]
-        if(damage_exp == &quot;K&quot;){
+        if(damage_exp == &quot;K&quot; || damage_exp == &quot;k&quot;){
                 damage_value &lt;- damage_value * 1000
-        } else if(damage_exp == &quot;M&quot;){
+        } else if(damage_exp == &quot;M&quot; || damage_exp == &quot;m&quot;){
                 damage_value &lt;- damage_value * 1000000
-        } else if(damage_exp == &quot;B&quot;){
+        } else if(damage_exp == &quot;B&quot; ||damage_exp == &quot;b&quot;){
                 damage_value &lt;- damage_value * 1000000000
+        } else if(damage_exp == &quot;?&quot;){
+                damage_value &lt;- NA
+        } else if(is.numeric(damage_exp)){
+                damage_value &lt;- damage_value * (10 ^ as.numeric(damage_exp))
         }
         damage_value
 }
 stormdata$Property_damage_USD &lt;- apply(stormdata, 1, value_from_expander, damage_type = &quot;PROPDMG&quot;)
 stormdata$Crop_damage_USD &lt;- apply(stormdata, 1, value_from_expander, damage_type = &quot;CROPDMG&quot;)
-stormdata$Total_damage &lt;- stormdata$Property_damage_USD + stormdata$Crop_damage_USD
+rm(value_from_expander)
+stormdata$Total_damage &lt;- with(stormdata, rowSums(cbind(Property_damage_USD, Crop_damage_USD), na.rm = TRUE))
 head(stormdata)</code></pre>
 <pre><code>##   STATE__   BGN_DATE BGN_TIME TIME_ZONE COUNTY COUNTYNAME STATE  EVTYPE
 ## 1       1 1950-04-18     0130       CST     97     MOBILE    AL TORNADO
@@ -487,20 +509,27 @@ head(stormdata)</code></pre>
 </div>
 <div id="question-1---which-types-of-events-are-most-harmful-to-human-health" class="section level2">
 <h2>Question 1 - Which types of events are most harmful to human health</h2>
-<p>This question could be interepted in several ways, some things to consider</p>
+<p>This question could be interepted in several ways, some things to consider are as follows:</p>
 <ul>
-<li>human health could be considered in the following ways: + the most people effected + only permant effects considered + only direct fatalities considered + a different scoring for direct and indirect fatalities/injuries +a different scoring for fatalities and injuries</li>
-<li>classification of event type could be considered in the following ways: + Event Name + Designator</li>
-<li>is there more data available for certain event types and thus could the results be skewed?</li>
-<li>advancements in warning systems may have reduce the damage of particular event types in more recent years, should this be a consideration?</li>
-<li>should the most extreme cases be included or valued the same?</li>
-<li>will the population suffer the same impact from the same event as in previous times</li>
+<li><p>human health could be considered in the following ways:</p>
+<pre><code>+ the most people effected
+
++ only permant effects considered
+
++ only direct fatalities considered
+
++ a different scoring for direct and indirect fatalities/injuries
+
++ a different scoring for fatalities and injuries</code></pre></li>
+<li><p>is there more data available for certain event types and thus could the results be skewed?</p></li>
+<li><p>advancements in warning systems may have reduce the damage of particular event types in more recent years, should this be a consideration?</p></li>
+<li><p>should the most extreme cases be included or valued the same?</p></li>
+<li><p>will the population suffer the same impact from the same event as in previous times</p></li>
 </ul>
 <div id="assumptions" class="section level3">
 <h3>Assumptions</h3>
 <ul>
 <li><p>The study doesn’t specify if deaths and injury are caused directly or indirectly. For this reason they will be treated of the same value.</p></li>
-<li><p>The event type will grouped by event name</p></li>
 <li><p>Since an acurate prediction model for times in between freak event of certain event types isn’t available the assumption wil be made the same type and magnitude is as likely to reoccur as any other event type.</p></li>
 </ul>
 </div>
@@ -510,9 +539,8 @@ head(stormdata)</code></pre>
 <p>Linear regression will be used, if a p value of less than 0.02 is found then a allowance based on the regression will be used.</p>
 <p>This should correlation should include the advancements in any warning systems over time.</p>
 <p>Adding a sum of deaths and injuries to the data. New column will be called FATAL_AND_INJ</p>
-<pre class="r"><code>stormdata &lt;- stormdata %&gt;% mutate(FATAL_AND_INJ = FATALITIES + INJURIES)</code></pre>
-<pre><code>## Warning: package 'bindrcpp' was built under R version 3.5.1</code></pre>
-<pre class="r"><code>head(stormdata[,c(&quot;FATALITIES&quot;,&quot;INJURIES&quot;,&quot;FATAL_AND_INJ&quot;)])</code></pre>
+<pre class="r"><code>stormdata &lt;- stormdata %&gt;% mutate(FATAL_AND_INJ = FATALITIES + INJURIES)
+head(stormdata[,c(&quot;FATALITIES&quot;,&quot;INJURIES&quot;,&quot;FATAL_AND_INJ&quot;)])</code></pre>
 <pre><code>##   FATALITIES INJURIES FATAL_AND_INJ
 ## 1          0       15            15
 ## 2          0        0             0
@@ -611,16 +639,15 @@ head(arrange(penaltyeval, desc(TOTAL_W_PEN)))</code></pre>
 ## 4 FLOOD           7259      11707.
 ## 5 LIGHTNING       6046      40834.
 ## 6 HEAT            3037       5409.</code></pre>
-<p>Although the pentaly does have an affect on the order in which the events should be considered to have the largest impact tornado clearly have the largest impact in both occasions.</p>
-<p>The impact of the zero measure might have impacted the decline even though this could also skew the results as more events are currently recorded than in previous years.</p>
+<p>The pentaly does have an affect on the order in which the events should be considered to have the largest impact. However, Tornados clearly have the largest impact in both occasions.</p>
+<p>The impact of the zero measure might have impacted the decline. Even if the zero measures could be process, there is a possibility they would skew the results as more events are currently recorded than in previous years.</p>
 <pre class="r"><code>rm(penaltyeval)</code></pre>
 </div>
 </div>
 <div id="how-human-health-will-be-considered-for-this-study" class="section level3">
 <h3>How human health will be considered for this study</h3>
-<p>The comparing a human life to severe injury is contraversal and in the terms of the data the specific severity of injuries is not defined and the type widely varied so it can’t be defined even in a monetary way.</p>
-<p>Testing if changed the ratio of value place on death compared to injury affects the most harmful event type. To see if futher research would be worthwhile to give a clearer result.</p>
-<p>Since it is very difficult to define a ratio a broad range from 1:1 to 100:1 will be tested.</p>
+<p>Testing to see if changed the ratio of death compared to injury affects the most harmful event type.</p>
+<p>A broad range from 1:1 to 100:1 will be tested.</p>
 <p>Only the 20 event types with the highest health impact will be reviewed.</p>
 <pre class="r"><code>totalinjsperevent &lt;- stormdatahealth %&gt;% group_by(EVTYPE) %&gt;% summarise(TOTAL_FATAL = sum(FATALITIES), TOTAL_INJ = sum(INJURIES), TOTAL_FAI = sum(FATAL_AND_INJ))
 totalinjsperevent &lt;- arrange(totalinjsperevent, desc(TOTAL_FAI))[1:20,]
@@ -634,7 +661,7 @@ head(totalinjsperevent)</code></pre>
 ## 4 FLOOD                  470      6789      7259
 ## 5 LIGHTNING              816      5230      6046
 ## 6 HEAT                   937      2100      3037</code></pre>
-<p>Calculating data required for a normalized plot</p>
+<p>Calculating data required for plot.</p>
 <pre class="r"><code>#creating the x values, which will be the fatality to injury grading ratio
 injurygradingratio &lt;- c(1, seq(5,100, by = 5))
 #function for calulating the new grade based on the ratio
@@ -674,12 +701,13 @@ head(graded_health_scores)</code></pre>
 ## [4,] 1664        5752              725
 ## [5,] 1974        7592              785
 ## [6,] 2284        9432              845</code></pre>
-<p>Melting the data frame in to x y cordinates and normalizing</p>
+<p>Melting the data frame in to x y cordinates and normalizing for ease of viewing.</p>
 <pre class="r"><code>event_type_count &lt;- ncol(graded_health_scores)
 graded_health_scores &lt;- melt(graded_health_scores)
 graded_health_scores$Var1 &lt;- rep(injurygradingratio, event_type_count)
 colnames(graded_health_scores) &lt;- c(&quot;ratio&quot;, &quot;event_type&quot;, &quot;scores&quot;)
 norm_graded_health_scores &lt;- graded_health_scores %&gt;% group_by(ratio) %&gt;% mutate_at(vars(scores), funs(scale(.) %&gt;% as.vector()) )
+rm(graded_health_scores, event_type_count, injurygradingratio, ratio_calc)
 head(norm_graded_health_scores)</code></pre>
 <pre><code>## # A tibble: 6 x 3
 ## # Groups:   ratio [6]
@@ -691,7 +719,7 @@ head(norm_graded_health_scores)</code></pre>
 ## 4    15 TORNADO      4.14
 ## 5    20 TORNADO      4.12
 ## 6    25 TORNADO      4.10</code></pre>
-<p>Plotting the effect of the ratio</p>
+<p>Plotting the effect of the ratio.</p>
 <pre class="r"><code>p &lt;- ggplot(norm_graded_health_scores[1:105,], aes(x=ratio, y=scores, colour = event_type, group = event_type))
 p &lt;- p + geom_line()
 p &lt;- p + geom_point()
@@ -710,12 +738,12 @@ p</code></pre>
 </div>
 <div id="considerations" class="section level3">
 <h3>Considerations</h3>
-<p>There a few things we might want to considerer when answering this question</p>
+<p>Considerations when answering this question:</p>
 <ul>
 <li><p>should there be an economic value set for the impacts to human health?</p></li>
 <li><p>do we need to account for inflation?</p></li>
-<li><p>the data set operates in good faith with cost estimates, with regulation there could be some discreptances</p></li>
-<li><p>are there null fields in the data and how should they be handled</p></li>
+<li><p>the data set operates in good faith with cost estimates. This could cause some discreptances. Though a calculation guide is provided.</p></li>
+<li><p>are there null fields in the data</p></li>
 </ul>
 <pre class="r"><code>sapply(stormdata, function(x){length(which(is.na(x)))})</code></pre>
 <pre><code>##             STATE__            BGN_DATE            BGN_TIME 
@@ -743,86 +771,35 @@ p</code></pre>
 ##          LATITUDE_E          LONGITUDE_             REMARKS 
 ##                  40                   0                   0 
 ##              REFNUM Property_damage_USD     Crop_damage_USD 
-##                   0                   0                   0 
+##                   0                   8                   7 
 ##        Total_damage       FATAL_AND_INJ 
 ##                   0                   0</code></pre>
-<p>*without any NA values it is impossible to tell if zero estimates are accurate or just no information supplied. THis could require further analysis.</p>
 <ul>
-<li>other related costs such as debris clearing, fire fighting and personnel overtime charges are not included in these estimates</li>
+<li>could some of the zero could fields be na values?</li>
+</ul>
+<pre class="r"><code>sum(length(match(0, stormdata$Total_damage)))</code></pre>
+<pre><code>## [1] 1</code></pre>
+<ul>
+<li><p>the damage expanded field has values outside the scope outlined in the documentation. A method has been developed in the Data Cleaning section.</p></li>
+<li><p>other related costs such as debris clearing, fire fighting and personnel overtime charges are not included in these estimates</p></li>
+<li><p>flood events require a property damage figure where other events do not, which could skew results</p></li>
+<li><p>particular event types might be better documented in regards to damages</p></li>
 </ul>
 </div>
 <div id="assumptions-1" class="section level3">
 <h3>Assumptions</h3>
 <ul>
-<li><p>The study doesn’t specify if deaths and injury are caused directly or indirectly. For this reason they will be treated of the same value.</p></li>
-<li><p>The event type will grouped by event name</p></li>
-<li><p>Since an acurate prediction model for times in between freak event of certain event types isn’t available the assumption wil be made the same type and magnitude is as likely to reoccur as any other event type.</p></li>
-<li><p>human health will not be considered in this study as it is hard put a price value too and insurficent data is contained in this study</p></li>
+<li><p>Due to the very small number of missing values I have assumed they won’t have a large bearing on the results.</p></li>
+<li><p>Due to the very small number of 0 values I have assumed they won’t have a large bearing on results.</p></li>
+<li><p>Resonable assumptions were made in the damage expansion fields that were outside the documented scope. Calculation in the Data Cleaning section.</p></li>
+<li><p>Given the lack of predicability of these natural events all will be weighted evenly.</p></li>
+<li><p>The econmic value of a human life required to change the event type that causes the most economic damage will be reviewed.</p></li>
+<li><p>it would be possible to go through the event naratives to obtain additional costing in regards to more significant figure estimes. Since there isn’t a direct sentence structure stimpulated for data entry extraction would be too difficulat and time consuming for this study. Much of this data is likely missing anyway and small by comparision.</p></li>
+<li><p>Inflation will not be accounted for in this analysis as fixed values are supplied for damages in the study and as such the damage estimates should not have increased over time for the same items.</p></li>
 </ul>
-<p>*it would be possible to go through the event naratives to obtain additional costing in regards to more significant figure estimes. Since there isn’t a direct sentence structure stimpulated for data entry extraction would be too difficulat and time consuming for this study. Much of this data is likely missing anyway.</p>
-<p>*Inflation will not be accounted for in this analysis as fixed values are supplied for damages in the study and as such the damage estimates should not have increased over time for the same items.</p>
 </div>
-<div id="the-value-of-the-us-currency-over-time" class="section level3">
-<h3>The value of the US currency over time</h3>
-<p>Chosen to disregaurd inflation as noted above. Data is still included but not currently used.</p>
-<p>Inflation data will be added below and add a copy of the data will be available on the GitHub repository.</p>
-<p>This data was downloaded from the Federal Reserve Bank of St. Louis from <a href="https://fred.stlouisfed.org/series/FPCPITOTLZGUSA">this page</a>.</p>
-<p>The data available is from the year 1960 till 2016. Other years will be excluded due to lack of information</p>
-</div>
-<div id="adding-the-inflation-data" class="section level3">
-<h3>Adding the inflation data</h3>
-<pre class="r"><code>fileurl &lt;- &quot;https://fred.stlouisfed.org/graph/fredgraph.csv?chart_type=line&amp;recession_bars=on&amp;log_scales=&amp;bgcolor=%23e1e9f0&amp;graph_bgcolor=%23ffffff&amp;fo=Open+Sans&amp;ts=12&amp;tts=12&amp;txtcolor=%23444444&amp;show_legend=yes&amp;show_axis_titles=yes&amp;drp=0&amp;cosd=1960-01-01&amp;coed=2016-01-01&amp;height=450&amp;stacking=&amp;range=Custom&amp;mode=fred&amp;id=FPCPITOTLZGUSA&amp;transformation=lin&amp;nd=1960-01-01&amp;ost=-99999&amp;oet=99999&amp;lsv=&amp;lev=&amp;mma=0&amp;fml=a&amp;fgst=lin&amp;fgsnd=2009-06-01&amp;fq=Annual&amp;fam=avg&amp;vintage_date=&amp;revision_date=&amp;line_color=%234572a7&amp;line_style=solid&amp;lw=2&amp;scale=left&amp;mark_type=none&amp;mw=2&amp;width=749#&quot;
-filepath &lt;- &quot;./ProjectData/inflation.csv&quot;
-projectdatapath &lt;- &quot;./ProjectData&quot;
-if(!file.exists(filepath)){
-        if(!dir.exists(projectdatapath)){
-               dir.create(projectdatapath) 
-        }
-        download.file(fileurl, filepath)
-}
-rm(fileurl)</code></pre>
-<p>Add data to r</p>
-<pre class="r"><code>inflation_data &lt;- read.csv(filepath)
-head(inflation_data)</code></pre>
-<pre><code>##         DATE FPCPITOTLZGUSA
-## 1 1960-01-01       1.509929
-## 2 1961-01-01       1.075182
-## 3 1962-01-01       1.116071
-## 4 1963-01-01       1.214128
-## 5 1964-01-01       1.308615
-## 6 1965-01-01       1.668461</code></pre>
-</div>
-<div id="cleaning-the-inflation-data" class="section level3">
-<h3>Cleaning the inflation data</h3>
-<pre class="r"><code>inflation_data$DATE &lt;- as.Date(inflation_data$DATE)
-inflation_data$Year &lt;- lubridate::year(inflation_data$DATE)
-colnames(inflation_data) &lt;- c(&quot;Date&quot;, &quot;Inflation_rate&quot;,&quot;Year&quot;)
-head(inflation_data)</code></pre>
-<pre><code>##         Date Inflation_rate Year
-## 1 1960-01-01       1.509929 1960
-## 2 1961-01-01       1.075182 1961
-## 3 1962-01-01       1.116071 1962
-## 4 1963-01-01       1.214128 1963
-## 5 1964-01-01       1.308615 1964
-## 6 1965-01-01       1.668461 1965</code></pre>
-<p>Extracting the year from the date data in the storm data set</p>
-<pre class="r"><code>stormdata$Year &lt;- lubridate::year(stormdata$BGN_DATE)
-head(stormdata[,c(&quot;BGN_DATE&quot;, &quot;Year&quot;)])</code></pre>
-<pre><code>##     BGN_DATE Year
-## 1 1950-04-18 1950
-## 2 1950-04-18 1950
-## 3 1951-02-20 1951
-## 4 1951-06-08 1951
-## 5 1951-11-15 1951
-## 6 1951-11-15 1951</code></pre>
-<p>Calculating the accumlative inflation</p>
-<pre class="r"><code>cumlative_inflation = 0
-for(i in 1:nrow(inflation_data)){
-        
-}</code></pre>
-</div>
-<div id="creating-a-damage-data-sumary-grouped-by-event-type" class="section level3">
-<h3>Creating a damage data sumary grouped by event type</h3>
+<div id="creating-a-damage-data-summary-grouped-by-event-type" class="section level3">
+<h3>Creating a damage data summary grouped by event type</h3>
 <pre class="r"><code>#Due to an issue with grouping not working I needed to reattach the plyr and dplyr packages
 detach(package:plyr)
 detach(package:dplyr)
@@ -851,19 +828,23 @@ library(plyr)</code></pre>
 ## 
 ##     intersect, setdiff, setequal, union</code></pre>
 <pre class="r"><code>Damages_by_event_type &lt;- group_by(stormdata, EVTYPE)
-Damages_by_event_type &lt;- summarize(Damages_by_event_type, Property_damage_USD = sum(Property_damage_USD), Crop_damage_USD = sum(Crop_damage_USD), Total_damage = sum(Total_damage))
+Damages_by_event_type &lt;- summarize(Damages_by_event_type, Property_damage_USD = sum(Property_damage_USD, na.rm = TRUE), Crop_damage_USD = sum(Crop_damage_USD, na.rm = TRUE), Total_damage = sum(Total_damage))
 Damages_by_event_type &lt;- arrange(Damages_by_event_type, desc(Total_damage))
-head(Damages_by_event_type)</code></pre>
-<pre><code>## # A tibble: 6 x 4
-##   EVTYPE            Property_damage_USD Crop_damage_USD  Total_damage
-##   &lt;fct&gt;                           &lt;dbl&gt;           &lt;dbl&gt;         &lt;dbl&gt;
-## 1 FLOOD                   144657709807       5661968450 150319678257 
-## 2 HURRICANE/TYPHOON        69305840000       2607872800  71913712800 
-## 3 TORNADO                  56925660790.       414953270  57340614060.
-## 4 STORM SURGE              43323536000             5000  43323541000 
-## 5 HAIL                     15727367053.      3025537890  18752904943.
-## 6 FLASH FLOOD              16140812067.      1421317100  17562129167.</code></pre>
-<p>Reducing this data for plotting results, only the 20 event types with the largest cost will be shown.</p>
+head(Damages_by_event_type, 10)</code></pre>
+<pre><code>## # A tibble: 10 x 4
+##    EVTYPE            Property_damage_USD Crop_damage_USD  Total_damage
+##    &lt;fct&gt;                           &lt;dbl&gt;           &lt;dbl&gt;         &lt;dbl&gt;
+##  1 FLOOD                   144657709807       5661968450 150319678257 
+##  2 HURRICANE/TYPHOON        69305840000       2607872800  71913712800 
+##  3 TORNADO                  56937160779.       414953270  57352114049.
+##  4 STORM SURGE              43323536000             5000  43323541000 
+##  5 HAIL                     15732267048.      3025954473  18758221521.
+##  6 FLASH FLOOD              16140812067.      1421317100  17562129167.
+##  7 DROUGHT                   1046106000      13972566000  15018672000 
+##  8 HURRICANE                11868319010       2741910000  14610229010 
+##  9 RIVER FLOOD               5118945500       5029459000  10148404500 
+## 10 ICE STORM                 3944927860       5022113500   8967041360</code></pre>
+<p>Reducing this data for plotting results. Only the 20 event types with the largest cost will be shown.</p>
 <pre class="r"><code>Reduced_damages_by_event_type &lt;- Damages_by_event_type[1:20,] %&gt;% select(-Total_damage) %&gt;% rename(Event_type = EVTYPE)
 Reduced_damages_by_event_type$Event_type &lt;- with(Reduced_damages_by_event_type, factor(Event_type, Event_type))
 Reduced_damages_by_event_type &lt;- melt(Reduced_damages_by_event_type, id = &quot;Event_type&quot;)
@@ -873,18 +854,18 @@ head(Reduced_damages_by_event_type)</code></pre>
 <pre><code>##          Event_type Damage_type     Cost_USD
 ## 1             FLOOD    Property 144657709807
 ## 2 HURRICANE/TYPHOON    Property  69305840000
-## 3           TORNADO    Property  56925660790
+## 3           TORNADO    Property  56937160779
 ## 4       STORM SURGE    Property  43323536000
-## 5              HAIL    Property  15727367053
+## 5              HAIL    Property  15732267048
 ## 6       FLASH FLOOD    Property  16140812067</code></pre>
 </div>
 </div>
 </div>
 <div id="results" class="section level1">
 <h1>Results</h1>
-<div id="question-1---which-event-type-had-the-largest-impact-to-human-health" class="section level2">
-<h2>Question 1 - Which event type had the largest impact to human health?</h2>
-<p>Since putting a higher value on fatalities compared to injuries didn’t affect the outcome of the event type with the largest impact. Nor did calculation of a reducition in impact to human health in modern times. The output plot will simply contain some of the highest damage event types with the quanities of injuries and deaths.</p>
+<div id="question-1---across-the-united-states-are-most-harmful-with-respect-to-population-health" class="section level2">
+<h2>Question 1 - Across the United States are most harmful with respect to population health?</h2>
+<p>Potentail impacts did not have a notable effect on the event type that has the largest impact to human health. The plot will show the number of fatalities and injuries for the 20 highest impact event types.</p>
 <pre class="r"><code>totals &lt;- totalinjsperevent %&gt;% arrange(desc(TOTAL_FAI)) %&gt;% select(-TOTAL_FAI)
 totals &lt;- melt(totals, id.vars = &quot;EVTYPE&quot;, measure.vars = c(&quot;TOTAL_FATAL&quot;, &quot;TOTAL_INJ&quot;))
 colnames(totals) &lt;- c(&quot;event&quot;, &quot;injury_type&quot;,&quot;no_of_injuries&quot;)
@@ -916,7 +897,7 @@ p &lt;- p + ggtitle(&quot;Economic damage of different event types&quot;)
 p &lt;- p + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 p</code></pre>
 <p><img src="data:image/png;base64,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" /><!-- --></p>
-<p>It is clear that floods are the event type that cause the most economical damage.</p>
+<p>It is clear that floods are the event type that cause the most economical damage and property damage.</p>
 <p>It is also clear that droughts cause the largest amount of crop damage.</p>
 <div id="reviewing-the-economic-value-of-a-life" class="section level3">
 <h3>Reviewing the Economic Value of a life</h3>
@@ -928,7 +909,7 @@ Tornado_fatalities &lt;- totalinjsperevent %&gt;% filter(EVTYPE == &quot;TORNADO
 cost_per_life &lt;- (Tornado_damage_cost - Flood_damage_cost)/(Flood_fatalities - Tornado_fatalities)
 cost_per_life</code></pre>
 <pre><code>##   Total_damage
-## 1     18008728</code></pre>
+## 1     18006501</code></pre>
 <p>I human life would need to have an economic value of over 18 Million before tornados caused the highest economical damage.</p>
 </div>
 </div>

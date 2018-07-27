@@ -1,0 +1,7 @@
+base
+plyr
+dplyr
+reshape2
+ggplot2
+lubridate
+bindrcpp

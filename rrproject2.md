@@ -13,7 +13,7 @@ Synopsis
 Question 1 - Impact on human health
 --------------------------------------
 
-* Tornados have the most impact on human health
+* Tornados have the largest impact on human health
 
 * Tornados cause the greatest loss of life
 
@@ -32,21 +32,14 @@ Question 2 - Largest economic cost
 All calculations are shown in the data processing section.
 
 
-
-
-
-
-
-
-
-
-
 Project Goal
 ============
 
 Use the data to answer some basic questions about severe weather events.
 
 Questions:
+----------
+
 1. Across the United States, which types of events (as indicated in the <span style="color:red" face="KaTeX_Typewriter">EVTYPE</span> variable) are most harmful with respect to population health?
 
 2. Across the United States, which types of events have the greatest economic consequences?
@@ -64,7 +57,7 @@ Data retrived from the [here](https://d396qusza40orc.cloudfront.net/repdata%2Fda
 
 This project is part of the data science specialization course by John Hopkins University hosted by [Coursera](https://www.coursera.com/).
 
-Consult README.md for more information
+Consult README.md for more information about the project.
 
 
 
@@ -185,8 +178,8 @@ library(lubridate)
 
 
 
-Downloading Data from orginal source
-------------------------------------
+Downloading Data from the orginal source
+-----------------------------------------
 
 
 ```r
@@ -203,8 +196,8 @@ rm(fileurl)
 ```
 
 
-Loading data into R
--------------------
+Loading the data into R
+------------------------
 
 ```r
 stormdata <- read.csv(zippath)
@@ -401,7 +394,7 @@ str(stormdata)
 Cleaning the data
 -----------------
 
-Converting the BGN_DATE to date format
+Converting the BGN_DATE to date format.
 
 
 ```r
@@ -413,7 +406,7 @@ str(stormdata$BGN_DATE)
 ##  Date[1:902297], format: "1950-04-18" "1950-04-18" "1951-02-20" "1951-06-08" "1951-11-15" ...
 ```
 
-Data on damage cost is provided as a 3 signifcant figure value and a expander letter 
+Data on damage cost is provided as a 3 signifcant figure value and a expander letter.
 
 * K = 1 000
 
@@ -421,7 +414,40 @@ Data on damage cost is provided as a 3 signifcant figure value and a expander le
 
 * B = 1 000 000 000
 
-Converting these values to numeric
+Check if the values provided match the documentation.
+
+
+```r
+unique(stormdata$CROPDMGEXP)
+```
+
+```
+## [1]   M K m B ? 0 k 2
+## Levels:  ? 0 2 B k K m M
+```
+
+```r
+unique(stormdata$CROPDMGEXP)
+```
+
+```
+## [1]   M K m B ? 0 k 2
+## Levels:  ? 0 2 B k K m M
+```
+
+Both these these sets have values which don't match. 
+There is no infomation on process these values.
+I will use the values as follows.
+
+* Lowercase letters - Indicate the same as the Uppercase letters
+
+* ? - Indicates an NA value
+
+* "+", "-" - Will be ignored
+
+* postive intergers - Will be mutipled by the value using 10^x. Where x is the positive interger.
+
+Converting these values to numeric totals. 
 
 
 ```r
@@ -429,18 +455,23 @@ value_from_expander <- function(data, damage_type){
         damage_type_exp <- paste(damage_type, "EXP", sep="")
         damage_value <- as.numeric(data[damage_type])
         damage_exp <- data[damage_type_exp]
-        if(damage_exp == "K"){
+        if(damage_exp == "K" || damage_exp == "k"){
                 damage_value <- damage_value * 1000
-        } else if(damage_exp == "M"){
+        } else if(damage_exp == "M" || damage_exp == "m"){
                 damage_value <- damage_value * 1000000
-        } else if(damage_exp == "B"){
+        } else if(damage_exp == "B" ||damage_exp == "b"){
                 damage_value <- damage_value * 1000000000
+        } else if(damage_exp == "?"){
+                damage_value <- NA
+        } else if(is.numeric(damage_exp)){
+                damage_value <- damage_value * (10 ^ as.numeric(damage_exp))
         }
         damage_value
 }
 stormdata$Property_damage_USD <- apply(stormdata, 1, value_from_expander, damage_type = "PROPDMG")
 stormdata$Crop_damage_USD <- apply(stormdata, 1, value_from_expander, damage_type = "CROPDMG")
-stormdata$Total_damage <- stormdata$Property_damage_USD + stormdata$Crop_damage_USD
+rm(value_from_expander)
+stormdata$Total_damage <- with(stormdata, rowSums(cbind(Property_damage_USD, Crop_damage_USD), na.rm = TRUE))
 head(stormdata)
 ```
 
@@ -493,27 +524,32 @@ head(stormdata)
 Question 1 - Which types of events are most harmful to human health
 -----------------------------------------------------------------------
 
-This question could be interepted in several ways, some things to consider
+This question could be interepted in several ways, some things to consider are as follows:
 
 * human health could be considered in the following ways:
+
         + the most people effected
+        
         + only permant effects considered
+        
         + only direct fatalities considered
+        
         + a different scoring for direct and indirect fatalities/injuries
-        +a different scoring for fatalities and injuries
-* classification of event type could be considered in the following ways:
-        + Event Name
-        + Designator
+        
+        + a different scoring for fatalities and injuries
+        
+        
 * is there more data available for certain event types and thus could the results be skewed?
+
 * advancements in warning systems may have reduce the damage of particular event types in more recent years, should this be a consideration?
+
 * should the most extreme cases be included or valued the same?
+
 * will the population suffer the same impact from the same event as in previous times
 
 ### Assumptions 
 
 * The study doesn't specify if deaths and injury are caused directly or indirectly. For this reason they will be treated of the same value. 
-
-* The event type will grouped by event name
 
 * Since an acurate prediction model for times in between freak event of certain event types isn't available the assumption wil be made the same type and magnitude is as likely to reoccur as any other event type. 
 
@@ -530,13 +566,6 @@ Adding a sum of deaths and injuries to the data. New column will be called FATAL
 
 ```r
 stormdata <- stormdata %>% mutate(FATAL_AND_INJ = FATALITIES + INJURIES)
-```
-
-```
-## Warning: package 'bindrcpp' was built under R version 3.5.1
-```
-
-```r
 head(stormdata[,c("FATALITIES","INJURIES","FATAL_AND_INJ")])
 ```
 
@@ -695,9 +724,11 @@ head(arrange(penaltyeval, desc(TOTAL)))
 ## 6 HEAT            3037       5409.
 ```
 
-Although the pentaly does have an affect on the order in which the events should be considered to have the largest impact tornado clearly have the largest impact in both occasions.
+The pentaly does have an affect on the order in which the events should be considered to have the largest impact.
+However, Tornados clearly have the largest impact in both occasions.
 
-The impact of the zero measure might have impacted the decline even though this could also skew the results as more events are currently recorded than in previous years. 
+The impact of the zero measure might have impacted the decline. 
+Even if the zero measures could be process, there is a possibility they would skew the results as more events are currently recorded than in previous years. 
 
 
 ```r
@@ -706,11 +737,9 @@ rm(penaltyeval)
 
 ### How human health will be considered for this study
 
-The comparing a human life to severe injury is contraversal and in the terms of the data the specific severity of injuries is not defined and the type widely varied so it can't be defined even in a monetary way.
+Testing to see if changed the ratio of death compared to injury affects the most harmful event type. 
 
-Testing if changed the ratio of value place on death compared to injury affects the most harmful event type. To see if futher research would be worthwhile to give a clearer result. 
-
-Since it is very difficult to define a ratio a broad range from 1:1 to 100:1 will be tested. 
+A broad range from 1:1 to 100:1 will be tested. 
 
 Only the 20 event types with the highest health impact will be reviewed.
 
@@ -733,7 +762,7 @@ head(totalinjsperevent)
 ## 6 HEAT                   937      2100      3037
 ```
 
-Calculating data required for a normalized plot
+Calculating data required for plot.
 
 
 ```r
@@ -782,7 +811,7 @@ head(graded_health_scores)
 ```
 
 
-Melting the data frame in to x y cordinates and normalizing
+Melting the data frame in to x y cordinates and normalizing for ease of viewing.
 
 
 ```r
@@ -791,6 +820,7 @@ graded_health_scores <- melt(graded_health_scores)
 graded_health_scores$Var1 <- rep(injurygradingratio, event_type_count)
 colnames(graded_health_scores) <- c("ratio", "event_type", "scores")
 norm_graded_health_scores <- graded_health_scores %>% group_by(ratio) %>% mutate_at(vars(scores), funs(scale(.) %>% as.vector()) )
+rm(graded_health_scores, event_type_count, injurygradingratio, ratio_calc)
 head(norm_graded_health_scores)
 ```
 
@@ -807,7 +837,7 @@ head(norm_graded_health_scores)
 ## 6    25 TORNADO      4.10
 ```
 
-Plotting the effect of the ratio
+Plotting the effect of the ratio.
 
 
 ```r
@@ -820,7 +850,7 @@ p <- p + ggtitle("Impact of changing the \nfatality:injury ratio")
 p
 ```
 
-![](rrproject2_files/figure-html/unnamed-chunk-16-1.png)<!-- -->
+![](rrproject2_files/figure-html/unnamed-chunk-17-1.png)<!-- -->
 
 From this plot we can see that how we ratio is not important in derterming the event type with the largest impact to human health.
 
@@ -831,15 +861,17 @@ Question 2
 
 ###Considerations
 
-There a few things we might want to considerer when answering this question
+Considerations when answering this question:
 
 * should there be an economic value set for the impacts to human health?
 
 * do we need to account for inflation?
 
-* the data set operates in good faith with cost estimates, with regulation there could be some discreptances
+* the data set operates in good faith with cost estimates. 
+This could cause some discreptances. 
+Though a calculation guide is provided. 
 
-* are there null fields in the data and how should they be handled
+* are there null fields in the data
 
 
 ```r
@@ -872,125 +904,51 @@ sapply(stormdata, function(x){length(which(is.na(x)))})
 ##          LATITUDE_E          LONGITUDE_             REMARKS 
 ##                  40                   0                   0 
 ##              REFNUM Property_damage_USD     Crop_damage_USD 
-##                   0                   0                   0 
+##                   0                   8                   7 
 ##        Total_damage       FATAL_AND_INJ 
 ##                   0                   0
 ```
 
+* could some of the zero could fields be na values?
 
-*without any NA values it is impossible to tell if zero estimates are accurate or just no information supplied. THis could require further analysis.
+
+```r
+sum(length(match(0, stormdata$Total_damage)))
+```
+
+```
+## [1] 1
+```
+
+* the damage expanded field has values outside the scope outlined in the documentation.
+A method has been developed in the Data Cleaning section.
 
 * other related costs such as debris clearing, fire fighting and personnel overtime charges are not included in these estimates
+
+* flood events require a property damage figure where other events do not, which could skew results
+
+* particular event types might be better documented in regards to damages
 
 
 ### Assumptions 
 
-* The study doesn't specify if deaths and injury are caused directly or indirectly. For this reason they will be treated of the same value. 
+* Due to the very small number of missing values I have assumed they won't have a large bearing on the results. 
 
-* The event type will grouped by event name
+* Due to the very small number of 0 values I have assumed they won't have a large bearing on results.
 
-* Since an acurate prediction model for times in between freak event of certain event types isn't available the assumption wil be made the same type and magnitude is as likely to reoccur as any other event type. 
+* Resonable assumptions were made in the damage expansion fields that were outside the documented scope. 
+Calculation in the Data Cleaning section.
 
-* human health will not be considered in this study as it is hard put a price value too and insurficent data is contained in this study
+* Given the lack of predicability of these natural events all will be weighted evenly. 
 
-*it would be possible to go through the event naratives to obtain additional costing in regards to more significant figure estimes. Since there isn't a direct sentence structure stimpulated for data entry extraction would be too difficulat and time consuming for this study. Much of this data is likely missing anyway.
+* The econmic value of a human life required to change the event type that causes the most economic damage will be reviewed.
 
-*Inflation will not be accounted for in this analysis as fixed values are supplied for damages in the study and as such the damage estimates should not have increased over time for the same items.
+* it would be possible to go through the event naratives to obtain additional costing in regards to more significant figure estimes. Since there isn't a direct sentence structure stimpulated for data entry extraction would be too difficulat and time consuming for this study. Much of this data is likely missing anyway and small by comparision.
 
-### The value of the US currency over time
-
-Chosen to disregaurd inflation as noted above. Data is still included but not currently used. 
-
-Inflation data will be added below and add a copy of the data will be available on the GitHub repository.
-
-This data was downloaded from the Federal Reserve Bank of St. Louis from [this page](https://fred.stlouisfed.org/series/FPCPITOTLZGUSA). 
-
-The data available is from the year 1960 till 2016. Other years will be excluded due to lack of information
-
-### Adding the inflation data
+* Inflation will not be accounted for in this analysis as fixed values are supplied for damages in the study and as such the damage estimates should not have increased over time for the same items.
 
 
-
-```r
-fileurl <- "https://fred.stlouisfed.org/graph/fredgraph.csv?chart_type=line&recession_bars=on&log_scales=&bgcolor=%23e1e9f0&graph_bgcolor=%23ffffff&fo=Open+Sans&ts=12&tts=12&txtcolor=%23444444&show_legend=yes&show_axis_titles=yes&drp=0&cosd=1960-01-01&coed=2016-01-01&height=450&stacking=&range=Custom&mode=fred&id=FPCPITOTLZGUSA&transformation=lin&nd=1960-01-01&ost=-99999&oet=99999&lsv=&lev=&mma=0&fml=a&fgst=lin&fgsnd=2009-06-01&fq=Annual&fam=avg&vintage_date=&revision_date=&line_color=%234572a7&line_style=solid&lw=2&scale=left&mark_type=none&mw=2&width=749#"
-filepath <- "./ProjectData/inflation.csv"
-projectdatapath <- "./ProjectData"
-if(!file.exists(filepath)){
-        if(!dir.exists(projectdatapath)){
-               dir.create(projectdatapath) 
-        }
-        download.file(fileurl, filepath)
-}
-rm(fileurl)
-```
-
-Add data to r
-
-
-```r
-inflation_data <- read.csv(filepath)
-head(inflation_data)
-```
-
-```
-##         DATE FPCPITOTLZGUSA
-## 1 1960-01-01       1.509929
-## 2 1961-01-01       1.075182
-## 3 1962-01-01       1.116071
-## 4 1963-01-01       1.214128
-## 5 1964-01-01       1.308615
-## 6 1965-01-01       1.668461
-```
-
-### Cleaning the inflation data
-
-
-```r
-inflation_data$DATE <- as.Date(inflation_data$DATE)
-inflation_data$Year <- lubridate::year(inflation_data$DATE)
-colnames(inflation_data) <- c("Date", "Inflation_rate","Year")
-head(inflation_data)
-```
-
-```
-##         Date Inflation_rate Year
-## 1 1960-01-01       1.509929 1960
-## 2 1961-01-01       1.075182 1961
-## 3 1962-01-01       1.116071 1962
-## 4 1963-01-01       1.214128 1963
-## 5 1964-01-01       1.308615 1964
-## 6 1965-01-01       1.668461 1965
-```
-
-Extracting the year from the date data in the storm data set
-
-
-```r
-stormdata$Year <- lubridate::year(stormdata$BGN_DATE)
-head(stormdata[,c("BGN_DATE", "Year")])
-```
-
-```
-##     BGN_DATE Year
-## 1 1950-04-18 1950
-## 2 1950-04-18 1950
-## 3 1951-02-20 1951
-## 4 1951-06-08 1951
-## 5 1951-11-15 1951
-## 6 1951-11-15 1951
-```
-
-Calculating the accumlative inflation
-
-
-```r
-cumlative_inflation = 0
-for(i in 1:nrow(inflation_data)){
-        
-}
-```
-
-###Creating a damage data sumary grouped by event type
+###Creating a damage data summary grouped by event type
 
 
 ```r
@@ -1055,24 +1013,29 @@ library(dplyr)
 
 ```r
 Damages_by_event_type <- group_by(stormdata, EVTYPE)
-Damages_by_event_type <- summarize(Damages_by_event_type, Property_damage_USD = sum(Property_damage_USD), Crop_damage_USD = sum(Crop_damage_USD), Total_damage = sum(Total_damage))
+Damages_by_event_type <- summarize(Damages_by_event_type, Property_damage_USD = sum(Property_damage_USD, na.rm = TRUE), Crop_damage_USD = sum(Crop_damage_USD, na.rm = TRUE), Total_damage = sum(Total_damage))
 Damages_by_event_type <- arrange(Damages_by_event_type, desc(Total_damage))
-head(Damages_by_event_type)
+head(Damages_by_event_type, 10)
 ```
 
 ```
-## # A tibble: 6 x 4
-##   EVTYPE            Property_damage_USD Crop_damage_USD  Total_damage
-##   <fct>                           <dbl>           <dbl>         <dbl>
-## 1 FLOOD                   144657709807       5661968450 150319678257 
-## 2 HURRICANE/TYPHOON        69305840000       2607872800  71913712800 
-## 3 TORNADO                  56925660790.       414953270  57340614060.
-## 4 STORM SURGE              43323536000             5000  43323541000 
-## 5 HAIL                     15727367053.      3025537890  18752904943.
-## 6 FLASH FLOOD              16140812067.      1421317100  17562129167.
+## # A tibble: 10 x 4
+##    EVTYPE            Property_damage_USD Crop_damage_USD  Total_damage
+##    <fct>                           <dbl>           <dbl>         <dbl>
+##  1 FLOOD                   144657709807       5661968450 150319678257 
+##  2 HURRICANE/TYPHOON        69305840000       2607872800  71913712800 
+##  3 TORNADO                  56937160779.       414953270  57352114049.
+##  4 STORM SURGE              43323536000             5000  43323541000 
+##  5 HAIL                     15732267048.      3025954473  18758221521.
+##  6 FLASH FLOOD              16140812067.      1421317100  17562129167.
+##  7 DROUGHT                   1046106000      13972566000  15018672000 
+##  8 HURRICANE                11868319010       2741910000  14610229010 
+##  9 RIVER FLOOD               5118945500       5029459000  10148404500 
+## 10 ICE STORM                 3944927860       5022113500   8967041360
 ```
 
-Reducing this data for plotting results, only the 20 event types with the largest cost will be shown.
+Reducing this data for plotting results.
+Only the 20 event types with the largest cost will be shown.
 
 
 ```r
@@ -1088,9 +1051,9 @@ head(Reduced_damages_by_event_type)
 ##          Event_type Damage_type     Cost_USD
 ## 1             FLOOD    Property 144657709807
 ## 2 HURRICANE/TYPHOON    Property  69305840000
-## 3           TORNADO    Property  56925660790
+## 3           TORNADO    Property  56937160779
 ## 4       STORM SURGE    Property  43323536000
-## 5              HAIL    Property  15727367053
+## 5              HAIL    Property  15732267048
 ## 6       FLASH FLOOD    Property  16140812067
 ```
 
@@ -1099,10 +1062,11 @@ head(Reduced_damages_by_event_type)
 Results
 =======
 
-Question 1 - Which event type had the largest impact to human health?
------------------------------------------------------------------------
+Question 1 - Across the United States are most harmful with respect to population health?
+------------------------------------------------------------------------------------------
 
-Since putting a higher value on fatalities compared to injuries didn't affect the outcome of the event type with the largest impact. Nor did calculation of a reducition in impact to human health in modern times. The output plot will simply contain some of the highest damage event types with the quanities of injuries and deaths.
+Potentail impacts did not have a notable effect on the event type that has the largest impact to human health.
+The plot will show the number of fatalities and injuries for the 20 highest impact event types. 
 
 
 
@@ -1124,10 +1088,11 @@ p <- p + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 p
 ```
 
-![](rrproject2_files/figure-html/unnamed-chunk-25-1.png)<!-- -->
+![](rrproject2_files/figure-html/unnamed-chunk-22-1.png)<!-- -->
 
 
-It is clear that Tornados are the event type that has the greatest impact to human health. In both injurys and fatalities it is clearly the highest. 
+It is clear that Tornados are the event type that has the greatest impact to human health. 
+In both injurys and fatalities it is clearly the highest. 
 
 Question 2 - Across the United States, which types of events have the greatest economic consequences?
 ---------------------------------------------------------------------------------------------------------
@@ -1148,9 +1113,9 @@ p <- p + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 p
 ```
 
-![](rrproject2_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
+![](rrproject2_files/figure-html/unnamed-chunk-23-1.png)<!-- -->
 
-It is clear that floods are the event type that cause the most economical damage.
+It is clear that floods are the event type that cause the most economical damage and property damage.
 
 It is also clear that droughts cause the largest amount of crop damage.
 
@@ -1170,7 +1135,7 @@ cost_per_life
 
 ```
 ##   Total_damage
-## 1     18008728
+## 1     18006501
 ```
 
 I human life would need to have an economic value of over 18 Million before tornados caused the highest economical damage.
